@@ -86,7 +86,7 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
 
     else:
         if norm_type == 2.0:
-            if get_accelerator().device_name() == 'cuda'
+            if get_accelerator().device_name() == 'cuda':
                 dummy_overflow_buf = get_accelerator().IntTensor([0])
                 # Use apex's multi-tensor applier for efficiency reasons.
                 # Multi-tensor applier takes a function and a list of list
