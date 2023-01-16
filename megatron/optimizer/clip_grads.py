@@ -99,8 +99,8 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
                 )
             else: 
                 grad_norm = torch.norm(grads_for_norm,p=2.0)
-                # Since we will be summing across data parallel groups,
-                # we need the pow(norm-type).
+            # Since we will be summing across data parallel groups,
+            # we need the pow(norm-type).
             total_norm = grad_norm ** norm_type
 
         else:
