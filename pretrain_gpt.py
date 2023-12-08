@@ -12,6 +12,7 @@ from megatron import get_tokenizer
 from megatron.core import mpu, tensor_parallel
 from megatron.core.enums import ModelType
 from megatron.data.gpt_dataset import build_train_valid_test_datasets
+from megatron.data.prompt_dataset import SupervisedDataset
 from megatron.model import GPTModel, GPTModelPipe
 from megatron.training import pretrain
 from megatron.utils import get_ltor_masks_and_position_ids
@@ -26,6 +27,7 @@ import subprocess
 
 from torch import nn
 import torch.nn.functional as F
+from transformers import AutoTokenizer
 
 
 def model_provider(pre_process=True, post_process=True):
@@ -100,10 +102,14 @@ def get_batch(data_iterator):
         data = None
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
+
+    #gao ding zheli jiuhaole 
     # Unpack.
     tokens_ = data_b['text'].long()
     labels = tokens_[:, 1:].contiguous()
     tokens = tokens_[:, :-1].contiguous()
+    
+    
 
     # Get the masks and postition ids.
     skip_mask = args.use_flash_attn or args.use_flash_attn_triton
@@ -169,16 +175,28 @@ def get_batch_pipe(data):
     tokenizer = get_tokenizer()
 
     # Items and their type.
-    keys = ['text']
+    keys = ['input_ids','labels']
     datatype = torch.int64
 
     # Broadcast data.
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
     # Unpack.
-    tokens_ = data_b['text'].long()
-    labels = tokens_[:, 1:].contiguous()
-    tokens = tokens_[:, :-1].contiguous()
+    # tokens_ = data_b['text'].long()
+    # labels = tokens_[:, 1:].contiguous()
+    # tokens = tokens_[:, :-1].contiguous()
+    
+    tokens = data_b['input_ids'].long().contiguous()
+    labels = data_b['labels'].long().contiguous()
+
+
+    # print(tokens)
+    # print(labels)
+    # print(f"token shape{tokens.shape}")
+    # print(f"labels shape{labels.shape}")
+    # unpack
+
+
 
     # Get the masks and postition ids.
     attention_mask, loss_mask, position_ids = get_ltor_masks_and_position_ids(
@@ -187,6 +205,9 @@ def get_batch_pipe(data):
         args.reset_position_ids,
         args.reset_attention_mask,
         args.eod_mask_loss)
+    loss_mask = labels.ne(0)
+    attention_mask=tokens.ne(tokenizer.pad)
+    # print(loss_mask)
     if args.curriculum_learning_legacy and args.curriculum_seqlen < tokens.size()[1]:
         # seqlen-based curriculum learning
         # tokens, position_ids, labels, loss_mask have size [batch size, seqlen]
@@ -195,7 +216,7 @@ def get_batch_pipe(data):
         if labels is not None:
             labels = labels[:, :args.curriculum_seqlen].contiguous()
         loss_mask = loss_mask[:, :args.curriculum_seqlen].contiguous()
-
+    
     return (tokens, position_ids, attention_mask), (labels, loss_mask)
 
 
@@ -317,7 +338,30 @@ def train_valid_test_datasets_provider(train_val_test_num_samples):
 
     return train_ds, valid_ds, test_ds
 
+def prompt_train_valid_test_datasets_provider(train_val_test_num_samples):
+    """Build train, valid, and test datasets."""
+    args = get_args()
 
+    print_rank_0('> building train, validation, and test datasets '
+                 'for GPT ...')
+    # train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
+    #     data_prefix=args.data_path,
+    #     data_impl=args.data_impl,
+    #     splits_string=args.split,
+    #     train_valid_test_num_samples=train_val_test_num_samples,
+    #     seq_length=args.seq_length,
+    #     seed=args.seed,
+    #     skip_warmup=(not args.mmap_warmup),
+    #     train_data_prefix=args.train_data_path,
+    #     valid_data_prefix=args.valid_data_path,
+    #     test_data_prefix=args.test_data_path,
+    #     data_cache_path=args.data_cache_path)
+    # /ssd/mingzhil/mega/llama-7b/tokenizer.model
+    # tokenizer = AutoTokenizer.from_pretrained("/ssd/mingzhil/mega/llama-7b")
+    tokenizer = get_tokenizer()
+    train_ds = SupervisedDataset("/ssd/mingzhil/dataset/alpaca_data_tiny.json",tokenizer)
+    return train_ds, None ,None
+    
 def command_exists(cmd):
     result = subprocess.Popen(f'type {cmd}', stdout=subprocess.PIPE, shell=True)
     return result.wait() == 0
@@ -347,7 +391,7 @@ def git_ds_info():
 
 if __name__ == "__main__":
     git_ds_info()
-    pretrain(train_valid_test_datasets_provider,
+    pretrain(prompt_train_valid_test_datasets_provider,
              model_provider,
              ModelType.encoder_or_decoder,
              forward_step,

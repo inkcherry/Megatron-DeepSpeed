@@ -145,6 +145,8 @@ def _build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
         if splits[index + 1] > splits[index]:
             documents = np.arange(start=splits[index], stop=splits[index + 1],
                                   step=1, dtype=np.int32)
+            
+            
             dataset = GPTDataset(name, data_prefix, documents, indexed_dataset,
                                  splits_string,
                                  train_valid_test_num_samples[index],
@@ -347,7 +349,11 @@ def _build_index_mappings(name, data_prefix, documents, sizes,
     desc += f"Sequence length {seq_length}\n"
     desc += f"Random seed {seed}\n"
     desc += f"Split {splits_string}\n"
+    
+    
     desc_hash = hashlib.md5(desc.encode('utf-8')).hexdigest()
+    
+    
     desc_filename = desc_hash + ".dsc"
     doc_idx_filename = desc_hash + '_doc_idx.npy'
     sample_idx_filename = desc_hash + '_sample_idx.npy'

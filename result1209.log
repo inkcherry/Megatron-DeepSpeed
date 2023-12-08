@@ -1,0 +1,326 @@
+[2023-12-09 15:36:45,822] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_01-model_states.pt...
+[2023-12-09 15:36:45,827] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:45,838] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_00-model_states.pt...
+[2023-12-09 15:36:45,839] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:45,844] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt...
+[2023-12-09 15:36:45,845] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt...
+[2023-12-09 15:36:45,845] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt...
+[2023-12-09 15:36:45,917] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_15-model_01-model_states.pt.
+[2023-12-09 15:36:45,929] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_00-model_states.pt.
+[2023-12-09 15:36:45,942] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_01-model_states.pt.
+[2023-12-09 15:36:45,946] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_00-model_states.pt.
+[2023-12-09 15:36:45,947] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:45,958] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt...
+[2023-12-09 15:36:45,961] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:45,962] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:45,962] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:45,962] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:45,964] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_01-model_states.pt...
+[2023-12-09 15:36:45,970] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:45,981] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_01-model_states.pt...
+[2023-12-09 15:36:45,981] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt...
+[2023-12-09 15:36:45,983] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:46,004] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,074] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:46,086] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:46,086] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:46,087] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:46,088] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_00-model_states.pt.
+[2023-12-09 15:36:46,092] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_01-model_states.pt...
+[2023-12-09 15:36:46,092] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_32-model_01-model_states.pt.
+[2023-12-09 15:36:46,094] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_01-model_states.pt.
+[2023-12-09 15:36:46,105] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:46,107] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_01-model_states.pt...
+[2023-12-09 15:36:46,115] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,122] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,123] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,123] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,123] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,132] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,133] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,136] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt...
+[2023-12-09 15:36:46,139] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,144] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,211] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:46,214] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_16-model_01-model_states.pt.
+[2023-12-09 15:36:46,214] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,224] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,226] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_01-model_states.pt.
+[2023-12-09 15:36:46,244] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,244] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,244] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,244] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_00-model_states.pt.
+[2023-12-09 15:36:46,254] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,255] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,255] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,255] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,256] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,259] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_01-model_states.pt...
+[2023-12-09 15:36:46,264] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt...
+[2023-12-09 15:36:46,265] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_01-model_states.pt...
+[2023-12-09 15:36:46,269] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,269] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,269] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_01-model_states.pt...
+[2023-12-09 15:36:46,270] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_01-model_states.pt.
+[2023-12-09 15:36:46,277] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,295] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,308] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_00_optim_states.pt...
+[2023-12-09 15:36:46,308] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,332] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_02_optim_states.pt...
+[2023-12-09 15:36:46,350] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_01-model_states.pt.
+[2023-12-09 15:36:46,351] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,363] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,365] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,365] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,373] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_00-model_states.pt.
+[2023-12-09 15:36:46,377] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_01-model_states.pt...
+[2023-12-09 15:36:46,382] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_01-model_states.pt...
+[2023-12-09 15:36:46,397] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_33-model_01-model_states.pt.
+[2023-12-09 15:36:46,409] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_01_optim_states.pt...
+ > using checkpoint value 2e-05 for learning rate
+ > using checkpoint value 0.0 for minimum learning rate
+ > using checkpoint value 64000 for warmup iterations
+ > using checkpoint value None for warmup tokens
+ > using checkpoint value 10240000 for total number of iterations
+ > using checkpoint value None for decay tokens
+ > using checkpoint value cosine for learning rate decay style
+ > using checkpoint value 0.1 for start weight decay
+ > using checkpoint value 0.1 for end weight decay
+ > using checkpoint value 112000 for total number of weight decay iterations
+ > using checkpoint value constant for weight decay incr style
+[2023-12-09 15:36:46,436] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_00_optim_states.pt...
+[2023-12-09 15:36:46,436] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt...
+[2023-12-09 15:36:46,437] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_00-model_states.pt.
+[2023-12-09 15:36:46,437] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_01-model_states.pt...
+[2023-12-09 15:36:46,437] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_34-model_01-model_states.pt.
+[2023-12-09 15:36:46,438] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,459] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_01-model_states.pt.
+[2023-12-09 15:36:46,461] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt...
+[2023-12-09 15:36:46,465] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_02_optim_states.pt...
+[2023-12-09 15:36:46,486] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_03_optim_states.pt...
+[2023-12-09 15:36:46,502] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_17-model_01-model_states.pt.
+[2023-12-09 15:36:46,530] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_00-model_states.pt.
+[2023-12-09 15:36:46,542] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_01-model_states.pt...
+[2023-12-09 15:36:46,562] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_01_optim_states.pt...
+[2023-12-09 15:36:46,627] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/layer_35-model_01-model_states.pt.
+[2023-12-09 15:36:46,653] [INFO] [torch_checkpoint_engine.py:27:load] [Torch] Loading checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_03_optim_states.pt...
+[2023-12-09 15:36:51,345] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_02_optim_states.pt.
+[2023-12-09 15:36:51,346] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 6
+[2023-12-09 15:36:51,611] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_02_optim_states.pt.
+[2023-12-09 15:36:51,612] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 4
+[2023-12-09 15:36:51,625] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_00_optim_states.pt.
+[2023-12-09 15:36:51,626] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 0
+[2023-12-09 15:36:51,783] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_01_optim_states.pt.
+[2023-12-09 15:36:51,784] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 1
+[2023-12-09 15:36:51,793] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_01_optim_states.pt.
+[2023-12-09 15:36:51,794] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 3
+[2023-12-09 15:36:52,621] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_03_optim_states.pt.
+[2023-12-09 15:36:52,622] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 7
+[2023-12-09 15:36:52,810] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_1_mp_rank_00_optim_states.pt.
+[2023-12-09 15:36:52,811] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 2
+[2023-12-09 15:36:53,099] [INFO] [torch_checkpoint_engine.py:29:load] [Torch] Loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf/global_step0/bf16_zero_pp_rank_0_mp_rank_03_optim_states.pt.
+[2023-12-09 15:36:53,100] [INFO] [engine.py:2981:_get_all_zero_checkpoint_state_dicts] successfully read 2 ZeRO state_dicts for rank 5
+[2023-12-09 15:36:54,098] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 6
+[2023-12-09 15:36:54,960] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 0
+[2023-12-09 15:36:55,108] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 3
+[2023-12-09 15:36:55,118] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 4
+ checkpoint version 3.0
+[2023-12-09 15:36:55,824] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 5
+[2023-12-09 15:36:56,962] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 7
+[2023-12-09 15:36:59,844] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 1
+[2023-12-09 15:37:01,026] [INFO] [engine.py:2913:_load_zero_checkpoint] loading 2 zero partition checkpoints for rank 2
+  successfully loaded checkpoint from /ssd/mingzhil/mega/llama-7b-mega-ds-T2P2D2-from_hf at iteration 0
+(min, max) time across ranks (ms):
+    load-checkpoint ................................: (20050.23, 20050.34)
+[after model, optimizer, and learning rate scheduler are built] datetime: 2023-12-09 15:37:01 
+> building train, validation, and test datasets ...
+ > datasets target sizes (minimum size):
+    train:      112000
+WARNING:root:Loading data...
+WARNING:root:Loading data...
+    validation: 115200
+    test:       3200WARNING:root:Loading data...
+
+> building train, validation, and test datasets for GPT ...
+WARNING:root:Loading data...
+WARNING:root:Formatting inputs...
+WARNING:root:Formatting inputs...
+WARNING:root:Formatting inputs...
+WARNING:root:Formatting inputs...
+WARNING:root:Tokenizing inputs... This may take some time...
+WARNING:root:Tokenizing inputs... This may take some time...
+WARNING:root:Tokenizing inputs... This may take some time...
+WARNING:root:Tokenizing inputs... This may take some time...
+[after dataloaders are built] datetime: 2023-12-09 15:39:18 
+done with setup ...
+(min, max) time across ranks (ms):
+    model-and-optimizer-setup ......................: (28047.38, 28047.90)
+    train/valid/test-data-iterators-setup ..........: (135405.87, 136838.96)training ...
+
+[before the start of training step] datetime: 2023-12-09 15:39:18 
+ iteration       50/    3500 | consumed samples:         1600 | consumed tokens:       819200 | elapsed time per iteration (ms): 1565.3 | learning rate: 5.000E-07 | global batch size:    32 | lm loss: 1.011669E+01 | grad norm: 67.128 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 20.444 | tokens per gpu per second (tgs): 1308.393 | TFLOPs: 52.40 |
+[Rank 5] (after 50 iterations) memory (MB) | allocated: 22871.12744140625 | max allocated: 27043.38427734375 | reserved: 30560.0 | max reserved: 30560.0[Rank 1] (after 50 iterations) memory (MB) | allocated: 22556.57080078125 | max allocated: 30575.60693359375 | reserved: 34058.0 | max reserved: 34058.0[Rank 4] (after 50 iterations) memory (MB) | allocated: 22870.62744140625 | max allocated: 27041.88427734375 | reserved: 30560.0 | max reserved: 30560.0
+
+
+[Rank 0] (after 50 iterations) memory (MB) | allocated: 22555.57080078125 | max allocated: 30576.60693359375 | reserved: 34054.0 | max reserved: 34054.0
+[2023-12-09 15:41:44,639] [INFO] [logging.py:96:log_dist] [Rank 0] step=100, skipped=0, lr=[1e-06, 1e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 100 loss: 3.0125 iter time (s): 1.457 samples/sec: 21.958
+ iteration      100/    3500 | consumed samples:         3200 | consumed tokens:      1638400 | elapsed time per iteration (ms): 1357.2 | learning rate: 1.000E-06 | global batch size:    32 | lm loss: 5.901181E+00 | grad norm: 22.683 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.578 | tokens per gpu per second (tgs): 1508.994 | TFLOPs: 60.43 |
+ iteration      150/    3500 | consumed samples:         4800 | consumed tokens:      2457600 | elapsed time per iteration (ms): 1362.3 | learning rate: 1.500E-06 | global batch size:    32 | lm loss: 2.758053E+00 | grad norm: 6.607 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.489 | tokens per gpu per second (tgs): 1503.295 | TFLOPs: 60.21 |
+[2023-12-09 15:44:01,500] [INFO] [logging.py:96:log_dist] [Rank 0] step=200, skipped=0, lr=[2e-06, 2e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 200 loss: 2.2698 iter time (s): 1.365 samples/sec: 23.450
+ iteration      200/    3500 | consumed samples:         6400 | consumed tokens:      3276800 | elapsed time per iteration (ms): 1375.0 | learning rate: 2.000E-06 | global batch size:    32 | lm loss: 2.474805E+00 | grad norm: 11.650 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.273 | tokens per gpu per second (tgs): 1489.491 | TFLOPs: 59.65 |
+ iteration      250/    3500 | consumed samples:         8000 | consumed tokens:      4096000 | elapsed time per iteration (ms): 1376.5 | learning rate: 2.500E-06 | global batch size:    32 | lm loss: 2.215309E+00 | grad norm: 8.558 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.247 | tokens per gpu per second (tgs): 1487.816 | TFLOPs: 59.59 |
+[2023-12-09 15:46:18,800] [INFO] [logging.py:96:log_dist] [Rank 0] step=300, skipped=0, lr=[3e-06, 3e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 300 loss: 1.8087 iter time (s): 1.369 samples/sec: 23.377
+ iteration      300/    3500 | consumed samples:         9600 | consumed tokens:      4915200 | elapsed time per iteration (ms): 1369.4 | learning rate: 3.000E-06 | global batch size:    32 | lm loss: 1.958187E+00 | grad norm: 7.814 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.368 | tokens per gpu per second (tgs): 1495.560 | TFLOPs: 59.90 |
+ iteration      350/    3500 | consumed samples:        11200 | consumed tokens:      5734400 | elapsed time per iteration (ms): 1371.9 | learning rate: 3.500E-06 | global batch size:    32 | lm loss: 1.690094E+00 | grad norm: 6.318 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.326 | tokens per gpu per second (tgs): 1492.847 | TFLOPs: 59.79 |
+[2023-12-09 15:48:36,090] [INFO] [logging.py:96:log_dist] [Rank 0] step=400, skipped=0, lr=[4e-06, 4e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 400 loss: 1.3114 iter time (s): 1.369 samples/sec: 23.377
+ iteration      400/    3500 | consumed samples:        12800 | consumed tokens:      6553600 | elapsed time per iteration (ms): 1373.9 | learning rate: 4.000E-06 | global batch size:    32 | lm loss: 1.464505E+00 | grad norm: 4.199 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.291 | tokens per gpu per second (tgs): 1490.642 | TFLOPs: 59.70 |
+ iteration      450/    3500 | consumed samples:        14400 | consumed tokens:      7372800 | elapsed time per iteration (ms): 1369.6 | learning rate: 4.500E-06 | global batch size:    32 | lm loss: 1.327069E+00 | grad norm: 2.587 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.364 | tokens per gpu per second (tgs): 1495.282 | TFLOPs: 59.89 |
+[2023-12-09 15:50:53,492] [INFO] [logging.py:96:log_dist] [Rank 0] step=500, skipped=0, lr=[5e-06, 5e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 500 loss: 1.3349 iter time (s): 1.370 samples/sec: 23.358
+ iteration      500/    3500 | consumed samples:        16000 | consumed tokens:      8192000 | elapsed time per iteration (ms): 1378.4 | learning rate: 5.000E-06 | global batch size:    32 | lm loss: 1.282009E+00 | grad norm: 2.797 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.215 | tokens per gpu per second (tgs): 1485.784 | TFLOPs: 59.51 |
+ iteration      550/    3500 | consumed samples:        17600 | consumed tokens:      9011200 | elapsed time per iteration (ms): 1371.8 | learning rate: 5.500E-06 | global batch size:    32 | lm loss: 1.255692E+00 | grad norm: 3.510 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.327 | tokens per gpu per second (tgs): 1492.947 | TFLOPs: 59.79 |
+[2023-12-09 15:53:10,657] [INFO] [logging.py:96:log_dist] [Rank 0] step=600, skipped=0, lr=[6e-06, 6e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 600 loss: 1.1039 iter time (s): 1.368 samples/sec: 23.399
+ iteration      600/    3500 | consumed samples:        19200 | consumed tokens:      9830400 | elapsed time per iteration (ms): 1371.5 | learning rate: 6.000E-06 | global batch size:    32 | lm loss: 1.249832E+00 | grad norm: 1.402 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.332 | tokens per gpu per second (tgs): 1493.266 | TFLOPs: 59.81 |
+ iteration      650/    3500 | consumed samples:        20800 | consumed tokens:     10649600 | elapsed time per iteration (ms): 1378.6 | learning rate: 6.500E-06 | global batch size:    32 | lm loss: 1.287167E+00 | grad norm: 2.514 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.212 | tokens per gpu per second (tgs): 1485.562 | TFLOPs: 59.50 |
+[2023-12-09 15:55:28,155] [INFO] [logging.py:96:log_dist] [Rank 0] step=700, skipped=0, lr=[7e-06, 7e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 700 loss: 1.1966 iter time (s): 1.371 samples/sec: 23.341
+ iteration      700/    3500 | consumed samples:        22400 | consumed tokens:     11468800 | elapsed time per iteration (ms): 1371.5 | learning rate: 7.000E-06 | global batch size:    32 | lm loss: 1.247831E+00 | grad norm: 2.557 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.332 | tokens per gpu per second (tgs): 1493.269 | TFLOPs: 59.81 |
+ iteration      750/    3500 | consumed samples:        24000 | consumed tokens:     12288000 | elapsed time per iteration (ms): 1369.8 | learning rate: 7.500E-06 | global batch size:    32 | lm loss: 1.250889E+00 | grad norm: 2.662 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.362 | tokens per gpu per second (tgs): 1495.163 | TFLOPs: 59.88 |
+[2023-12-09 15:57:45,720] [INFO] [logging.py:96:log_dist] [Rank 0] step=800, skipped=0, lr=[8e-06, 8e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 800 loss: 1.1704 iter time (s): 1.371 samples/sec: 23.333
+ iteration      800/    3500 | consumed samples:        25600 | consumed tokens:     13107200 | elapsed time per iteration (ms): 1381.4 | learning rate: 8.000E-06 | global batch size:    32 | lm loss: 1.212792E+00 | grad norm: 3.015 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.165 | tokens per gpu per second (tgs): 1482.546 | TFLOPs: 59.38 |
+ iteration      850/    3500 | consumed samples:        27200 | consumed tokens:     13926400 | elapsed time per iteration (ms): 1372.2 | learning rate: 8.500E-06 | global batch size:    32 | lm loss: 1.191202E+00 | grad norm: 3.648 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.320 | tokens per gpu per second (tgs): 1492.480 | TFLOPs: 59.77 |
+[2023-12-09 16:00:02,816] [INFO] [logging.py:96:log_dist] [Rank 0] step=900, skipped=0, lr=[9e-06, 9e-06], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 900 loss: 0.9081 iter time (s): 1.367 samples/sec: 23.408
+ iteration      900/    3500 | consumed samples:        28800 | consumed tokens:     14745600 | elapsed time per iteration (ms): 1369.7 | learning rate: 9.000E-06 | global batch size:    32 | lm loss: 1.132776E+00 | grad norm: 3.162 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.363 | tokens per gpu per second (tgs): 1495.211 | TFLOPs: 59.88 |
+ iteration      950/    3500 | consumed samples:        30400 | consumed tokens:     15564800 | elapsed time per iteration (ms): 1371.3 | learning rate: 9.500E-06 | global batch size:    32 | lm loss: 1.081923E+00 | grad norm: 3.580 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.335 | tokens per gpu per second (tgs): 1493.433 | TFLOPs: 59.81 |
+[2023-12-09 16:02:20,072] [INFO] [logging.py:96:log_dist] [Rank 0] step=1000, skipped=0, lr=[1e-05, 1e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1000 loss: 1.0761 iter time (s): 1.369 samples/sec: 23.382
+ iteration     1000/    3500 | consumed samples:        32000 | consumed tokens:     16384000 | elapsed time per iteration (ms): 1373.8 | learning rate: 1.000E-05 | global batch size:    32 | lm loss: 1.020315E+00 | grad norm: 32.922 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.294 | tokens per gpu per second (tgs): 1490.803 | TFLOPs: 59.71 |
+ iteration     1050/    3500 | consumed samples:        33600 | consumed tokens:     17203200 | elapsed time per iteration (ms): 1380.0 | learning rate: 1.050E-05 | global batch size:    32 | lm loss: 9.766772E-01 | grad norm: 5.061 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.188 | tokens per gpu per second (tgs): 1484.048 | TFLOPs: 59.44 |
+[2023-12-09 16:04:37,601] [INFO] [logging.py:96:log_dist] [Rank 0] step=1100, skipped=0, lr=[1.1000000000000001e-05, 1.1000000000000001e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1100 loss: 0.7323 iter time (s): 1.371 samples/sec: 23.334
+ iteration     1100/    3500 | consumed samples:        35200 | consumed tokens:     18022400 | elapsed time per iteration (ms): 1370.6 | learning rate: 1.100E-05 | global batch size:    32 | lm loss: 9.097739E-01 | grad norm: 3.402 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.348 | tokens per gpu per second (tgs): 1494.277 | TFLOPs: 59.85 |
+ iteration     1150/    3500 | consumed samples:        36800 | consumed tokens:     18841600 | elapsed time per iteration (ms): 1377.4 | learning rate: 1.150E-05 | global batch size:    32 | lm loss: 8.606503E-01 | grad norm: 3.185 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.232 | tokens per gpu per second (tgs): 1486.819 | TFLOPs: 59.55 |
+[2023-12-09 16:06:54,931] [INFO] [logging.py:96:log_dist] [Rank 0] step=1200, skipped=0, lr=[1.2e-05, 1.2e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1200 loss: 0.7557 iter time (s): 1.369 samples/sec: 23.369
+ iteration     1200/    3500 | consumed samples:        38400 | consumed tokens:     19660800 | elapsed time per iteration (ms): 1369.2 | learning rate: 1.200E-05 | global batch size:    32 | lm loss: 7.994422E-01 | grad norm: 2.595 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.371 | tokens per gpu per second (tgs): 1495.730 | TFLOPs: 59.90 |
+ iteration     1250/    3500 | consumed samples:        40000 | consumed tokens:     20480000 | elapsed time per iteration (ms): 1369.9 | learning rate: 1.250E-05 | global batch size:    32 | lm loss: 7.841164E-01 | grad norm: 20.679 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.359 | tokens per gpu per second (tgs): 1494.960 | TFLOPs: 59.87 |
+[2023-12-09 16:09:11,879] [INFO] [logging.py:96:log_dist] [Rank 0] step=1300, skipped=0, lr=[1.3000000000000001e-05, 1.3000000000000001e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1300 loss: 0.6784 iter time (s): 1.366 samples/sec: 23.434
+ iteration     1300/    3500 | consumed samples:        41600 | consumed tokens:     21299200 | elapsed time per iteration (ms): 1368.9 | learning rate: 1.300E-05 | global batch size:    32 | lm loss: 7.542498E-01 | grad norm: 5.296 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.376 | tokens per gpu per second (tgs): 1496.052 | TFLOPs: 59.92 |
+ iteration     1350/    3500 | consumed samples:        43200 | consumed tokens:     22118400 | elapsed time per iteration (ms): 1385.3 | learning rate: 1.350E-05 | global batch size:    32 | lm loss: 6.954047E-01 | grad norm: 4.641 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.099 | tokens per gpu per second (tgs): 1478.331 | TFLOPs: 59.21 |
+[2023-12-09 16:11:30,296] [INFO] [logging.py:96:log_dist] [Rank 0] step=1400, skipped=0, lr=[1.4e-05, 1.4e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1400 loss: 0.7133 iter time (s): 1.380 samples/sec: 23.184
+ iteration     1400/    3500 | consumed samples:        44800 | consumed tokens:     22937600 | elapsed time per iteration (ms): 1383.0 | learning rate: 1.400E-05 | global batch size:    32 | lm loss: 6.838041E-01 | grad norm: 3.424 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.138 | tokens per gpu per second (tgs): 1480.852 | TFLOPs: 59.31 |
+ iteration     1450/    3500 | consumed samples:        46400 | consumed tokens:     23756800 | elapsed time per iteration (ms): 1376.1 | learning rate: 1.450E-05 | global batch size:    32 | lm loss: 6.613688E-01 | grad norm: 8.495 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.254 | tokens per gpu per second (tgs): 1488.264 | TFLOPs: 59.60 |
+[2023-12-09 16:13:48,292] [INFO] [logging.py:96:log_dist] [Rank 0] step=1500, skipped=0, lr=[1.5e-05, 1.5e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1500 loss: 0.6247 iter time (s): 1.376 samples/sec: 23.255
+ iteration     1500/    3500 | consumed samples:        48000 | consumed tokens:     24576000 | elapsed time per iteration (ms): 1383.8 | learning rate: 1.500E-05 | global batch size:    32 | lm loss: 6.197585E-01 | grad norm: 3.079 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.124 | tokens per gpu per second (tgs): 1479.958 | TFLOPs: 59.27 |
+ iteration     1550/    3500 | consumed samples:        49600 | consumed tokens:     25395200 | elapsed time per iteration (ms): 1374.6 | learning rate: 1.550E-05 | global batch size:    32 | lm loss: 5.780890E-01 | grad norm: 4.159 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.279 | tokens per gpu per second (tgs): 1489.835 | TFLOPs: 59.67 |
+[2023-12-09 16:16:06,271] [INFO] [logging.py:96:log_dist] [Rank 0] step=1600, skipped=0, lr=[1.6e-05, 1.6e-05], mom=[(0.9, 0.999), (0.9, 0.999)]
+steps: 1600 loss: 0.5688 iter time (s): 1.376 samples/sec: 23.258
+ iteration     1600/    3500 | consumed samples:        51200 | consumed tokens:     26214400 | elapsed time per iteration (ms): 1384.9 | learning rate: 1.600E-05 | global batch size:    32 | lm loss: 5.408355E-01 | grad norm: 2.281 | num zeros: 0.0 | actual seqlen:   512 | number of skipped iterations:   0 | number of nan iterations:   0 | samples per second: 23.106 | tokens per gpu per second (tgs): 1478.803 | TFLOPs: 59.23 |
+^A^A^C[2023-12-09 17:06:20,105] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197611
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+^C[2023-12-09 17:06:20,353] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197611
+
+
+
+Traceback (most recent call last):
+  File "/opt/conda/lib/python3.10/subprocess.py", line 1209, in wait
+    return self._wait(timeout=timeout)
+  File "/opt/conda/lib/python3.10/subprocess.py", line 1959, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/opt/conda/lib/python3.10/subprocess.py", line 1917, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/conda/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/opt/conda/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/adapter/../../debugpy/launcher/../../debugpy/__main__.py", line 39, in <module>
+    cli.main()
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/adapter/../../debugpy/launcher/../../debugpy/../debugpy/server/cli.py", line 430, in main
+    run()
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/adapter/../../debugpy/launcher/../../debugpy/../debugpy/server/cli.py", line 284, in run_file
+    runpy.run_path(target, run_name="__main__")
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/_pydevd_bundle/pydevd_runpy.py", line 321, in run_path
+    return _run_module_code(code, init_globals, run_name,
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/_pydevd_bundle/pydevd_runpy.py", line 135, in _run_module_code
+    _run_code(code, mod_globals, init_globals,
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/_pydevd_bundle/pydevd_runpy.py", line 124, in _run_code
+    exec(code, run_globals)
+  File "/opt/conda/bin/deepspeed", line 7, in <module>
+    exec(compile(f.read(), __file__, 'exec'))
+  File "/app/for_A800/tmp_1130/DeepSpeed/bin/deepspeed", line 6, in <module>
+    main()
+  File "/app/for_A800/tmp_1130/DeepSpeed/deepspeed/launcher/runner.py", line 586, in main
+    result.wait()
+  File "/opt/conda/lib/python3.10/subprocess.py", line 1222, in wait
+    self._wait(timeout=sigint_timeout)
+  File "/opt/conda/lib/python3.10/subprocess.py", line 1953, in _wait
+    time.sleep(delay)
+KeyboardInterrupt
+^C[2023-12-09 17:06:20,585] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197611
+Traceback (most recent call last):
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/pydevd.py", line 2282, in __wait_for_threads_to_finish
+    self._wait_for_threads_to_finish_called_event.wait(timeout=timeout)
+Traceback (most recent call last):
+  File "/opt/conda/lib/python3.10/threading.py", line 607, in wait
+    signaled = self._cond.wait(timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 324, in wait
+    gotit = waiter.acquire(True, timeout)
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/pydevd.py", line 2282, in __wait_for_threads_to_finish
+    self._wait_for_threads_to_finish_called_event.wait(timeout=timeout)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/opt/conda/lib/python3.10/threading.py", line 607, in wait
+    signaled = self._cond.wait(timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 324, in wait
+    gotit = waiter.acquire(True, timeout)
+KeyboardInterrupt
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/pydevd.py", line 2282, in __wait_for_threads_to_finish
+    self._wait_for_threads_to_finish_called_event.wait(timeout=timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 607, in wait
+    signaled = self._cond.wait(timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 324, in wait
+    gotit = waiter.acquire(True, timeout)
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/root/.vscode-server/extensions/ms-python.python-2023.22.0/pythonFiles/lib/python/debugpy/_vendored/pydevd/pydevd.py", line 2282, in __wait_for_threads_to_finish
+    self._wait_for_threads_to_finish_called_event.wait(timeout=timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 607, in wait
+    signaled = self._cond.wait(timeout)
+  File "/opt/conda/lib/python3.10/threading.py", line 324, in wait
+    gotit = waiter.acquire(True, timeout)
+KeyboardInterrupt
+^C[2023-12-09 17:06:20,763] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197611
+[2023-12-09 17:06:20,980] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197611
+(base) root@g0300:/app/for_A800/new_mega/Megatron-DeepSpeed# 
+[2023-12-09 17:06:22,255] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197612
+[2023-12-09 17:06:22,261] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197613
+[2023-12-09 17:06:22,267] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197614
+^C
+(base) root@g0300:/app/for_A800/new_mega/Megatron-DeepSpeed# 
+^C
+(base) root@g0300:/app/for_A800/new_mega/Megatron-DeepSpeed# 
+^C
+(base) root@g0300:/app/for_A800/new_mega/Megatron-DeepSpeed# 
+[2023-12-09 17:06:23,417] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197615
+[2023-12-09 17:06:23,423] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197616
+[2023-12-09 17:06:23,428] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197617
+[2023-12-09 17:06:23,434] [INFO] [launch.py:315:sigkill_handler] Killing subprocess 2197618
+[2023-12-09 17:06:23,438] [INFO] [launch.py:324:sigkill_handler] Main process receive(base) root@g0300:/app/for_A800/new_mega/Megatron-DeepSpeed
