@@ -12,6 +12,8 @@ from .gpt2_tokenization import GPT2Tokenizer
 
 def build_tokenizer(args):
     """Initialize tokenizer."""
+    
+    args.tokenizer_type = 'HFTokenizer'
     if args.rank == 0:
         print('> building {} tokenizer ...'.format(args.tokenizer_type),
               flush=True)
@@ -545,6 +547,8 @@ class _HFTokenizer(AbstractTokenizer):
     def __init__(self, tokenizer_name_or_path):
         name = tokenizer_name_or_path
         super().__init__(name)
+        
+        tokenizer_name_or_path = "/ssd/mingzhil/mega/llama-7b"
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
