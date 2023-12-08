@@ -9,9 +9,10 @@ import numpy as np
 from torch.utils.data import Dataset
 from megatron import get_args
 from megatron.core import mpu
+from deepspeed.runtime.dataloader import RepeatingLoader
 
 
-def build_pretraining_data_loader(dataset, consumed_samples):
+def build_pretraining_data_loader(dataset, consumed_samples,repeating=True):
     """Buld dataloader given an input dataset."""
 
     if dataset is None:
@@ -40,10 +41,13 @@ def build_pretraining_data_loader(dataset, consumed_samples):
                 args.dataloader_type))
 
     # Torch dataloader.
-    return torch.utils.data.DataLoader(dataset,
+    loader = torch.utils.data.DataLoader(dataset,
                                        batch_sampler=batch_sampler,
                                        num_workers=args.num_workers,
                                        pin_memory=True)
+    if repeating:
+        loader=RepeatingLoader(loader)
+    return loader
 
 class MegatronPretrainingSampler:
 
@@ -85,6 +89,7 @@ class MegatronPretrainingSampler:
             batch.append(idx)
             if len(batch) == self.micro_batch_times_data_parallel_size:
                 start_idx, end_idx = self.get_start_end_idx()
+
                 yield batch[start_idx:end_idx]
                 batch = []
 
@@ -123,7 +128,9 @@ class MegatronPretrainingRandomSampler:
         # Keep a copy of input params for later use.
         self.dataset = dataset
         self.total_samples = total_samples
+        # self.consumed_samples = 500000
         self.consumed_samples = consumed_samples
+
         self.micro_batch_size = micro_batch_size
         self.data_parallel_rank = data_parallel_rank
         self.data_parallel_size = data_parallel_size
@@ -153,6 +160,7 @@ class MegatronPretrainingRandomSampler:
 
         if isinstance(self.dataset, RandomSeedDataset):
             self.dataset.set_epoch(self.epoch)
+        
 
         # data sharding and random sampling
         if self.data_sharding:
@@ -184,3 +192,4 @@ class MegatronPretrainingRandomSampler:
                 self.consumed_samples += self.micro_batch_times_data_parallel_size
                 yield batch
                 batch = []
+          
