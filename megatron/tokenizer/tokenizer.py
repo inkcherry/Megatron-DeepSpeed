@@ -549,7 +549,19 @@ class _HFTokenizer(AbstractTokenizer):
         super().__init__(name)
         
         tokenizer_name_or_path = "/home/mingzhil/mingzhi_dataset/huggyllama-7b/llama-7b"
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path,padding_side="right",use_fast=False)
+        self.tokenizer.pad_token= "[PAD]"
+        # if self.tokenizer.pad_token is None:
+        #     print("1")
+        # if self.tokenizer.eos_token is None:
+        #     print("2")
+
+        # if self.tokenizer.bos_token is None:
+        #     print("3")
+        # if self.tokenizer.unk_token is None:
+        #     print("4")
+ 
+        self.tokenizer.model_max_length = 512
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
 

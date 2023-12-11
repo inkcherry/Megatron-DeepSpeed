@@ -188,10 +188,15 @@ def get_batch_pipe(data):
     
     tokens = data_b['input_ids'].long().contiguous()
     labels = data_b['labels'].long().contiguous()
-    print(f"token shape{tokens.shape}")
-    print(f"labels shape{labels.shape}")
 
+
+    # print(tokens)
+    # print(labels)
+    # print(f"token shape{tokens.shape}")
+    # print(f"labels shape{labels.shape}")
     # unpack
+
+
 
     # Get the masks and postition ids.
     attention_mask, loss_mask, position_ids = get_ltor_masks_and_position_ids(
@@ -200,6 +205,9 @@ def get_batch_pipe(data):
         args.reset_position_ids,
         args.reset_attention_mask,
         args.eod_mask_loss)
+    loss_mask = labels.ne(0)
+    attention_mask=tokens.ne(tokenizer.pad)
+    # print(loss_mask)
     if args.curriculum_learning_legacy and args.curriculum_seqlen < tokens.size()[1]:
         # seqlen-based curriculum learning
         # tokens, position_ids, labels, loss_mask have size [batch size, seqlen]
@@ -208,7 +216,7 @@ def get_batch_pipe(data):
         if labels is not None:
             labels = labels[:, :args.curriculum_seqlen].contiguous()
         loss_mask = loss_mask[:, :args.curriculum_seqlen].contiguous()
-
+    
     return (tokens, position_ids, attention_mask), (labels, loss_mask)
 
 
@@ -349,9 +357,9 @@ def prompt_train_valid_test_datasets_provider(train_val_test_num_samples):
     #     test_data_prefix=args.test_data_path,
     #     data_cache_path=args.data_cache_path)
     # /ssd/mingzhil/mega/llama-7b/tokenizer.model
-    tokenizer = AutoTokenizer.from_pretrained("/ssd/mingzhil/mega/llama-7b")
-
-    train_ds = SupervisedDataset("/ssd/mingzhil/dataset/alpaca_data.json",tokenizer)
+    # tokenizer = AutoTokenizer.from_pretrained("/ssd/mingzhil/mega/llama-7b")
+    tokenizer = get_tokenizer()
+    train_ds = SupervisedDataset("/ssd/mingzhil/dataset/alpaca_data_tiny.json",tokenizer)
     return train_ds, None ,None
     
 def command_exists(cmd):
