@@ -548,7 +548,7 @@ class _HFTokenizer(AbstractTokenizer):
         name = tokenizer_name_or_path
         super().__init__(name)
         
-        tokenizer_name_or_path = "/ssd/mingzhil/mega/llama-7b"
+        tokenizer_name_or_path = "/home/mingzhil/mingzhi_dataset/huggyllama-7b/llama-7b"
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
