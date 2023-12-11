@@ -9,12 +9,11 @@ import transformers
 from torch.utils.data import Dataset
 from transformers import Trainer
 import json
-IGNORE_INDEX = -100
+IGNORE_INDEX = 0
 DEFAULT_PAD_TOKEN = "[PAD]"
 DEFAULT_EOS_TOKEN = "</s>"
 DEFAULT_BOS_TOKEN = "<s>"
 DEFAULT_UNK_TOKEN = "<unk>"
-IGNORE_INDEX = -100
 PROMPT_DICT = {
     "prompt_input": (
         "Below is an instruction that describes a task, paired with an input that provides further context. "
@@ -41,12 +40,15 @@ def jload(f, mode="r"):
 class SupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
-    def __init__(self, data_path: str, tokenizer: transformers.PreTrainedTokenizer):
+    def __init__(self, data_path: str, HFtokenizer):
+        tokenizer = HFtokenizer.tokenizer
         super(SupervisedDataset, self).__init__()
         logging.warning("Loading data...")
         list_data_dict = jload(data_path)
-        tokenizer.pad_token=DEFAULT_PAD_TOKEN
+        
 
+        
+        
         logging.warning("Formatting inputs...")
         prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
         sources = [
@@ -71,7 +73,7 @@ def _tokenize_fn(strings: Sequence[str], tokenizer: transformers.PreTrainedToken
         tokenizer(
             text,
             return_tensors="pt",
-            padding="longest",
+            padding="max_length",
             max_length=tokenizer.model_max_length,
             truncation=True,
         )
