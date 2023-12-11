@@ -12,6 +12,7 @@ from .gpt2_tokenization import GPT2Tokenizer
 
 def build_tokenizer(args):
     """Initialize tokenizer."""
+    args.tokenizer_type='GPTSentencePieceTokenizer'
     if args.rank == 0:
         print('> building {} tokenizer ...'.format(args.tokenizer_type),
               flush=True)

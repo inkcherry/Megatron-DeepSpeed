@@ -5,14 +5,14 @@ set -ex
 ######################################
 # Change the below configurations here
 BASE_PATH=./tmp
-DS_CONFIG=${BASE_PATH}/deepspeed.json
-DATASET_1="./tmp/data/bookcorpus_train_1m_text_sentence"
+DS_CONFIG=/home/mingzhil/official_mega_ds/Megatron-DeepSpeed/ds_config.json
+DATASET_1="/home/mingzhil/mingzhi_dataset/mega_dataset/tokenized_text_document"
 DATASET="1 ${DATASET_1}"
 CHECKPOINT_PATH=./tmp
-TOKENIZER_PATH=./tmp/tokenizer.model # offical llama tokenizer.model
+TOKENIZER_PATH=/home/mingzhil/mingzhi_dataset/huggyllama-7b/llama-7b/tokenizer.model # offical llama tokenizer.model
 
-TP=2
-PP=2
+TP=1
+PP=8
 ZERO_STAGE=0
 
 GPUS_PER_NODE=8
@@ -25,10 +25,15 @@ HIDDEN_SIZE=2048 # e.g. llama-13b: 5120
 FFN_HIDDEN_SIZE=5504 # e.g. llama-13b: 13824
 NUM_LAYERS=24 # e.g. llama-13b: 40
 NUM_HEADS=16 # e.g. llama-13b: 40
+
+# HIDDEN_SIZE=5120 # e.g. llama-13b: 5120
+# FFN_HIDDEN_SIZE=13824 # e.g. llama-13b: 13824
+# NUM_LAYERS=40 # e.g. llama-13b: 40
+# NUM_HEADS=40 # e.g. llama-13b: 40
 SEQ_LENGTH=2048
 
-MICRO_BATCH_SIZE=4
-GLOBAL_BATCH_SIZE=32 # e.g. llama: 4M tokens
+MICRO_BATCH_SIZE=1
+GLOBAL_BATCH_SIZE=256 # e.g. llama: 4M tokens
 TRAIN_STEPS=250000 # e.g. llama: 1T tokens / 4M tokens_per_batch = 250000 steps
 LR=3e-4
 MIN_LR=3e-5
@@ -120,13 +125,13 @@ torchrun $DISTRIBUTED_ARGS \
        --save-interval 10000 \
        --eval-interval 1000 \
        --eval-iters 10 \
-       --bf16 \
        --no-query-key-layer-scaling \
        --attention-dropout 0 \
        --hidden-dropout 0 \
-       --use-rotary-position-embeddings \
-       --untie-embeddings-and-output-weights \
        --swiglu \
        --normalization rmsnorm \
        --disable-bias-linear \
+    --no-masked-softmax-fusion \
+    --no-bias-gelu-fusion \
+    --no-bias-dropout-fusion \
        $ds_args

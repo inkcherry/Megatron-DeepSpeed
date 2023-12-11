@@ -18,11 +18,11 @@ from megatron.model import LayerNorm
 from .language_model import EmbeddingPipe
 from .transformer import ParallelTransformerLayerPipe, LMHeadPipe
 from deepspeed.pipe import PipelineModule, LayerSpec, TiedLayerSpec
-
-try:
-    from apex.normalization import MixedFusedRMSNorm
-except ImportError:
-    MixedFusedRMSNorm = None
+from megatron.model import RMSNorm
+# try:
+#     from apex.normalization import MixedFusedRMSNorm
+# except ImportError:
+#     MixedFusedRMSNorm = None
 
 try:         
     from deepspeed.checkpoint import (
@@ -289,7 +289,7 @@ class GPTModelPipe(PipelineModule,MegatronModule):
                           args.hidden_size,
                           eps=args.layernorm_epsilon))
         else:
-            self.specs.append(LayerSpec(MixedFusedRMSNorm, args.hidden_size, args.layernorm_epsilon))
+            self.specs.append(LayerSpec(RMSNorm, args.hidden_size, args.layernorm_epsilon))
 
         def _logits_helper(embedding, lm_output):
             """A wrapper to massage inputs/outputs from pipeline. """
