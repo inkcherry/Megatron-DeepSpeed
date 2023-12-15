@@ -61,8 +61,6 @@ def calc_start_and_end_index(hidden_size, local_rank, tp_parallel_size):
 def set_transfer_flag(mega_ds_weight,hf_weight):
     setattr(mega_ds_weight,"transfer_hf2megads_weight",True)
     setattr(hf_weight,"transfer_hf2megads_weight",True)
-    
-    a=0
 
 err_weight_list=[]
 def check_transfer(mega_ds_or_hf_weight):

@@ -316,50 +316,15 @@ def forward_step(data_iterator, model):
     return output_tensor, partial(loss_func, loss_mask, moe_loss, mos_loss)
 
 
-def train_valid_test_datasets_provider(train_val_test_num_samples):
-    """Build train, valid, and test datasets."""
-    args = get_args()
-
-    print_rank_0('> building train, validation, and test datasets '
-                 'for GPT ...')
-    train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
-        data_prefix=args.data_path,
-        data_impl=args.data_impl,
-        splits_string=args.split,
-        train_valid_test_num_samples=train_val_test_num_samples,
-        seq_length=args.seq_length,
-        seed=args.seed,
-        skip_warmup=(not args.mmap_warmup),
-        train_data_prefix=args.train_data_path,
-        valid_data_prefix=args.valid_data_path,
-        test_data_prefix=args.test_data_path,
-        data_cache_path=args.data_cache_path)
-    print_rank_0("> finished creating GPT datasets ...")
-
-    return train_ds, valid_ds, test_ds
-
 def prompt_train_valid_test_datasets_provider(train_val_test_num_samples):
     """Build train, valid, and test datasets."""
     args = get_args()
 
-    print_rank_0('> building train, validation, and test datasets '
-                 'for GPT ...')
-    # train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
-    #     data_prefix=args.data_path,
-    #     data_impl=args.data_impl,
-    #     splits_string=args.split,
-    #     train_valid_test_num_samples=train_val_test_num_samples,
-    #     seq_length=args.seq_length,
-    #     seed=args.seed,
-    #     skip_warmup=(not args.mmap_warmup),
-    #     train_data_prefix=args.train_data_path,
-    #     valid_data_prefix=args.valid_data_path,
-    #     test_data_prefix=args.test_data_path,
-    #     data_cache_path=args.data_cache_path)
-    # /ssd/mingzhil/mega/llama-7b/tokenizer.model
-    # tokenizer = AutoTokenizer.from_pretrained("/ssd/mingzhil/mega/llama-7b")
+    print_rank_0('> building finetune prompt datasets '
+                 'for llama ...')
+
     tokenizer = get_tokenizer()
-    train_ds = SupervisedDataset("/ssd/mingzhil/dataset/alpaca_data_tiny.json",tokenizer)
+    train_ds = SupervisedDataset(args.data_path[0],tokenizer)
     return train_ds, None ,None
     
 def command_exists(cmd):
