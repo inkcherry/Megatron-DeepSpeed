@@ -1,6 +1,6 @@
 # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
 
-"""Pretrain GPT"""
+"""Finetune LLAMA, Modified from pretrain_gpt.py"""
 
 import torch
 import math
@@ -102,15 +102,10 @@ def get_batch(data_iterator):
         data = None
     data_b = tensor_parallel.broadcast_data(keys, data, datatype)
 
-
-    #gao ding zheli jiuhaole 
     # Unpack.
     tokens_ = data_b['text'].long()
     labels = tokens_[:, 1:].contiguous()
     tokens = tokens_[:, :-1].contiguous()
-    
-    
-
     # Get the masks and postition ids.
     skip_mask = args.use_flash_attn or args.use_flash_attn_triton
     attention_mask, loss_mask, position_ids = get_ltor_masks_and_position_ids(
