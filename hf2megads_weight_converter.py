@@ -66,188 +66,207 @@ def print_distinct_weights(model):
             torch.distributed.barrier()
 
 
-def refactor_and_record_weight(model, loaded, args, config):
-    tokenizer = get_tokenizer()
+class refactor:
+    def __init__(self, model, loaded, args, config):
+        tokenizer = get_tokenizer()
+        # align layer number
+        self.model = model
+        self.loaded = loaded
+        self.config = config
 
-    # align layer number
-    offset_num = 2
-    mega_emb_wnum = 1
-    mega_norm_wnum = args.num_layers + 2
-    mega_lm_head_wnum = mega_norm_wnum + 1
-    token_vocab = tokenizer.vocab_size
-    padded_vocab_size = args.padded_vocab_size
-    more_padded = padded_vocab_size - token_vocab
-    tp_size = mpu.get_tensor_model_parallel_world_size()
-    tp_rank = mpu.get_tensor_model_parallel_rank()
-    decoder_pat = re.compile("(\d+)\.(.+)")
-    refactor_weight_list = []
-    for pname, p in model.named_parameters():
-        # refactor weight
-        if pname == f"{mega_emb_wnum}.word_embeddings.weight":
-            hf_name = "model.embed_tokens.weight"
-            hf_w = loaded[hf_name]
-            assert hf_w.shape[0] == token_vocab
-            per_partition_vocab_size, start_index, end_index = compute_partition_range(
-                padded_vocab_size, tp_rank, tp_size)
-            end_index = min(end_index, token_vocab)
-            real_partition_vocab_size = end_index - start_index
+        self.offset_num = 2
+        self.mega_emb_wnum = 1
+        self.mega_norm_wnum = args.num_layers + 2
+        self.mega_lm_head_wnum = self.mega_norm_wnum + 1
+        self.token_vocab = tokenizer.vocab_size
+        self.padded_vocab_size = args.padded_vocab_size
+        self.more_padded = self.padded_vocab_size - self.token_vocab
+        self.tp_size = mpu.get_tensor_model_parallel_world_size()
+        self.tp_rank = mpu.get_tensor_model_parallel_rank()
+        self.decoder_pat = re.compile("(\d+)\.(.+)")
+        self.refactor_weight_list = []
+        self.is_refactored = False
 
-            new_w = torch.zeros((per_partition_vocab_size,
-                                 hf_w.shape[1]),
-                                dtype=hf_w.dtype)
-            new_w[:real_partition_vocab_size, :] = hf_w[start_index:end_index, :]
-            if tp_rank == tp_size - 1:
-                new_w[-more_padded:] = hf_w[:token_vocab].mean(dim=0, keepdim=True)
-
-            refactor_weight_list.append(
-                f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [{start_index}:{end_index},:]  of {hf_w.shape}"
-            )
-            p.data.copy_(new_w)
-
-        elif pname == f"{mega_norm_wnum}.weight":
-            hf_w = loaded["model.norm.weight"]
-            refactor_weight_list.append(
-                f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  of {hf_w.shape}")
-            p.data.copy_(hf_w)
-
-        elif pname == f"{mega_lm_head_wnum}.lm_head.weight":
+    def _embedding_refactor(self, pname, p):
+        if pname == f"{self.mega_lm_head_wnum}.lm_head.weight":
             hf_name = "lm_head.weight"
-            hf_w = loaded[hf_name]
-            assert hf_w.shape[0] == token_vocab
+        elif pname == f"{self.mega_emb_wnum}.word_embeddings.weight":
+            hf_name = "model.embed_tokens.weight"
+        hf_w = self.loaded[hf_name]
+        assert hf_w.shape[0] == self.token_vocab
+        per_partition_vocab_size, start_index, end_index = compute_partition_range(
+            self.padded_vocab_size, self.tp_rank, self.tp_size)
+        end_index = min(end_index, self.token_vocab)
+        real_partition_vocab_size = end_index - start_index
 
-            per_partition_vocab_size, start_index, end_index = compute_partition_range(
-                padded_vocab_size, tp_rank, tp_size)
-            end_index = min(end_index, token_vocab)
-            real_partition_vocab_size = end_index - start_index
+        new_w = torch.zeros((per_partition_vocab_size, hf_w.shape[1]), dtype=hf_w.dtype)
+        new_w[:real_partition_vocab_size, :] = hf_w[start_index:end_index, :]
+        if self.tp_rank == self.tp_size - 1:
+            new_w[-self.more_padded:] = hf_w[:self.token_vocab].mean(dim=0, keepdim=True)
 
-            new_w = torch.zeros((per_partition_vocab_size,
-                                 hf_w.shape[1]),
-                                dtype=hf_w.dtype)
-            new_w[:real_partition_vocab_size, :] = hf_w[start_index:end_index, :]
-            if tp_rank == tp_size - 1:
-                new_w[-more_padded:] = hf_w[:token_vocab].mean(dim=0, keepdim=True)
+        self.record_mapping_info(
+            f"mega-ds: {pname,p.data.shape}<--hf: {hf_name,}  [{start_index}:{end_index},:]  of {hf_w.shape}"
+        )
+        return new_w
 
-            refactor_weight_list.append(
-                f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [{start_index}:{end_index},:]  of {hf_w.shape}"
-            )
+    def _direct_refactor(self, pname, p, hf_layer=None, subname=None):
+        if pname == f"{self.mega_norm_wnum}.weight":
+            hf_name = "model.norm.weight"
+        elif subname in ["input_layernorm.weight", "post_attention_layernorm.weight"]:
+            hf_name = f"model.layers.{hf_layer}.{subname}"
 
-            p.data.copy_(new_w)
+        new_w = hf_w = self.loaded[hf_name]
+        self.record_mapping_info(
+            f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  {hf_w.shape}")
+        return new_w
+
+    def _qkv_refactor(self, pname, p, hf_layer):
+        hf_wq_name = f"model.layers.{hf_layer}.self_attn.q_proj.weight"
+        hf_wk_name = f"model.layers.{hf_layer}.self_attn.k_proj.weight"
+        hf_wv_name = f"model.layers.{hf_layer}.self_attn.v_proj.weight"
+        wq = self.loaded[hf_wq_name]
+        wk = self.loaded[hf_wk_name]
+        wv = self.loaded[hf_wv_name]
+
+        hidden_size = wq.shape[0]
+        per_partition_size, start_index, end_index = compute_partition_range(
+            hidden_size, self.tp_rank, self.tp_size)
+        hidden_size_per_attention_head = divide(hidden_size,
+                                                self.config.num_attention_heads)
+        num_attention_heads_per_partition = divide(self.config.num_attention_heads,
+                                                   self.tp_size)
+
+        new_w = torch.zeros((per_partition_size * 3, wq.shape[1]), dtype=wq.dtype)
+
+        for i in range(num_attention_heads_per_partition):
+            current_index = start_index + i * hidden_size_per_attention_head
+            next_index = current_index + hidden_size_per_attention_head
+            new_w_index = i * (3 * hidden_size_per_attention_head)
+            new_w[new_w_index: new_w_index + (3 * hidden_size_per_attention_head), :] = \
+                torch.cat([
+                    wq[current_index: next_index, :],
+                    wk[current_index: next_index, :],
+                    wv[current_index: next_index, :]
+                ], dim=0)
+        self.record_mapping_info(
+            f"mega-ds:{pname,p.data.shape}<--hf{hf_wq_name,hf_wk_name,hf_wv_name,}  cat q,k,v [{current_index}:{next_index},:]  of q,k,v{wq.shape}"
+        )
+        return new_w
+
+    def _mlphto4h_dense_refactor(self, pname, p, hf_layer):
+        hf_w_gate_name = f"model.layers.{hf_layer}.mlp.gate_proj.weight"
+        hf_w_up_name = f"model.layers.{hf_layer}.mlp.up_proj.weight"
+        w_gate = self.loaded[hf_w_gate_name]
+        w_up = self.loaded[hf_w_up_name]
+
+        hidden_size = w_gate.shape[0]
+        per_partition_size, start_index, end_index = compute_partition_range(
+            hidden_size, self.tp_rank, self.tp_size)
+        new_w = torch.zeros((per_partition_size * 2,
+                             w_gate.shape[1]),
+                            dtype=w_gate.dtype)
+        new_w[:per_partition_size * 2, :] = \
+                torch.cat([
+                    w_gate[start_index:end_index, :],
+                    w_up[start_index:end_index, :]
+                ], dim=0)
+        self.record_mapping_info(
+            f"mega-ds:{pname,p.data.shape}<--hf{hf_w_gate_name,hf_w_up_name}  cat gate,up [{start_index}:{end_index},:]  of gate,up{w_gate.shape}"
+        )
+        return new_w
+
+    def _attn_dense_refactor(self, pname, p, hf_layer, subname):
+        if subname == "self_attention.dense.weight":
+            hf_name = f"model.layers.{hf_layer}.self_attn.o_proj.weight"
         else:
-            mobj = decoder_pat.match(pname)
-            layer_i = int(mobj.group(1))
-            subname = mobj.group(2)
+            hf_name = f"model.layers.{hf_layer}.mlp.down_proj.weight"
 
-            if subname in ["self_attention.query_key_value.weight"]:
-                hf_wq_name = f"model.layers.{layer_i - offset_num}.self_attn.q_proj.weight"
-                hf_wk_name = f"model.layers.{layer_i - offset_num}.self_attn.k_proj.weight"
-                hf_wv_name = f"model.layers.{layer_i - offset_num}.self_attn.v_proj.weight"
-                wq = loaded[hf_wq_name]
-                wk = loaded[hf_wk_name]
-                wv = loaded[hf_wv_name]
+        hf_w = self.loaded[hf_name]
+        hidden_size = hf_w.shape[1]
+        per_partition_size, start_index, end_index = compute_partition_range(
+            hidden_size, self.tp_rank, self.tp_size)
+        new_w = torch.zeros((hf_w.shape[0], per_partition_size), dtype=hf_w.dtype)
+        new_w[:, :per_partition_size] = hf_w[:, start_index:end_index]
+        self.record_mapping_info(
+            f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [:,{start_index}:{end_index}]  of {hf_w.shape}"
+        )
+        return new_w
 
-                hidden_size = wq.shape[0]
-                per_partition_size, start_index, end_index = compute_partition_range(
-                    hidden_size, tp_rank, tp_size)
-                hidden_size_per_attention_head = divide(hidden_size,
-                                                        config.num_attention_heads)
-                num_attention_heads_per_partition = divide(config.num_attention_heads,
-                                                           tp_size)
+    def _mlphto4h1_refactor(self, pname, p, hf_layer, subname):
+        if subname == "mlp.dense_h_to_4h1.weight":
+            hf_name = f"model.layers.{hf_layer}.mlp.gate_proj.weight"
+        else:
+            hf_name = f"model.layers.{hf_layer}.mlp.up_proj.weight"
+        hf_w = self.loaded[hf_name]
+        hidden_size = hf_w.shape[0]
+        per_partition_size, start_index, end_index = compute_partition_range(
+            hidden_size, self.tp_rank, self.tp_size)
+        new_w = torch.zeros((per_partition_size, hf_w.shape[1]), dtype=hf_w.dtype)
 
-                new_w = torch.zeros((per_partition_size * 3,
-                                     wq.shape[1]),
-                                    dtype=wq.dtype)
+        new_w[:per_partition_size, :] = hf_w[start_index:end_index, :]
+        self.record_mapping_info(
+            f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [{start_index}:{end_index},:]  of {hf_w.shape}"
+        )
+        return new_w
 
-                for i in range(num_attention_heads_per_partition):
-                    current_index = start_index + i * hidden_size_per_attention_head
-                    next_index = current_index + hidden_size_per_attention_head
-                    new_w_index = i * (3 * hidden_size_per_attention_head)
-                    new_w[new_w_index: new_w_index + (3 * hidden_size_per_attention_head), :] = \
-                        torch.cat([
-                            wq[current_index: next_index, :],
-                            wk[current_index: next_index, :],
-                            wv[current_index: next_index, :]
-                        ], dim=0)
-                refactor_weight_list.append(
-                    f"mega-ds:{pname,p.data.shape}<--hf{hf_wq_name,hf_wk_name,hf_wv_name,}  cat q,k,v [{current_index}:{next_index},:]  of q,k,v{wq.shape}"
-                )
-
-                p.data.copy_(new_w)
-
-            elif subname in ["mlp.dense_h_to_4h.weight"]:
-                hf_w_gate_name = f"model.layers.{layer_i - offset_num}.mlp.gate_proj.weight"
-                hf_w_up_name = f"model.layers.{layer_i - offset_num}.mlp.up_proj.weight"
-                w_gate = loaded[hf_w_gate_name]
-                w_up = loaded[hf_w_up_name]
-
-                hidden_size = w_gate.shape[0]
-                per_partition_size, start_index, end_index = compute_partition_range(
-                    hidden_size, tp_rank, tp_size)
-                new_w = torch.zeros((per_partition_size * 2,
-                                     w_gate.shape[1]),
-                                    dtype=w_gate.dtype)
-                new_w[:per_partition_size * 2, :] = \
-                        torch.cat([
-                            w_gate[start_index:end_index, :],
-                            w_up[start_index:end_index, :]
-                        ], dim=0)
-                refactor_weight_list.append(
-                    f"mega-ds:{pname,p.data.shape}<--hf{hf_w_gate_name,hf_w_up_name}  cat gate,up [{start_index}:{end_index},:]  of gate,up{w_gate.shape}"
-                )
-                p.data.copy_(new_w)
-
-            elif subname in ["self_attention.dense.weight", "mlp.dense_4h_to_h.weight"]:
-                if subname == "self_attention.dense.weight":
-                    hf_name = f"model.layers.{layer_i - offset_num}.self_attn.o_proj.weight"
-                else:
-                    hf_name = f"model.layers.{layer_i - offset_num}.mlp.down_proj.weight"
-
-                hf_w = loaded[hf_name]
-                hidden_size = hf_w.shape[1]
-                per_partition_size, start_index, end_index = compute_partition_range(
-                    hidden_size, tp_rank, tp_size)
-                new_w = torch.zeros((hf_w.shape[0],
-                                     per_partition_size),
-                                    dtype=hf_w.dtype)
-                new_w[:, :per_partition_size] = hf_w[:, start_index:end_index]
-                refactor_weight_list.append(
-                    f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [:,{start_index}:{end_index}]  of {hf_w.shape}"
-                )
-                p.data.copy_(new_w)
-
-            elif subname in ["mlp.dense_h_to_4h1.weight", "mlp.dense_h_to_4h2.weight"]:
-                if subname == "mlp.dense_h_to_4h1.weight":
-                    hf_name = f"model.layers.{layer_i - offset_num}.mlp.gate_proj.weight"
-
-                else:
-                    hf_name = f"model.layers.{layer_i - offset_num}.mlp.up_proj.weight"
-                hf_w = loaded[hf_name]
-                hidden_size = hf_w.shape[0]
-                per_partition_size, start_index, end_index = compute_partition_range(
-                    hidden_size, tp_rank, tp_size)
-                new_w = torch.zeros((per_partition_size,
-                                     hf_w.shape[1]),
-                                    dtype=hf_w.dtype)
-
-                new_w[:per_partition_size, :] = hf_w[start_index:end_index, :]
-                refactor_weight_list.append(
-                    f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  [{start_index}:{end_index},:]  of {hf_w.shape}"
-                )
-
-                p.data.copy_(new_w)
-
-            elif subname in [
-                    "input_layernorm.weight",
-                    "post_attention_layernorm.weight"
+    def refactor(self):
+        assert self.is_refactored == False
+        new_w = None
+        for pname, p in self.model.named_parameters():
+            if pname in [
+                    f"{self.mega_emb_wnum}.word_embeddings.weight",
+                    f"{self.mega_lm_head_wnum}.lm_head.weight"
             ]:
-                hf_name = f"model.layers.{layer_i - offset_num}.{subname}"
-                new_w = hf_w = loaded[hf_name]
-                refactor_weight_list.append(
-                    f"mega-ds:{pname,p.data.shape}<--hf{hf_name,}  {hf_w.shape}")
-
-                p.data.copy_(new_w)
+                new_w = self._embedding_refactor(pname, p)
+            elif pname == f"{self.mega_norm_wnum}.weight":
+                new_w = self._direct_refactor(pname, p)
             else:
-                raise ValueError("Unrecognized weight type")
-    return refactor_weight_list
+                mobj = self.decoder_pat.match(pname)
+                layer_num = int(mobj.group(1))
+                subname = mobj.group(2)
+                hf_layer = layer_num - self.offset_num
+                if subname in ["self_attention.query_key_value.weight"]:
+                    new_w = self._qkv_refactor(pname, p, hf_layer)
+                elif subname in ["mlp.dense_h_to_4h.weight"]:
+                    new_w = self._mlphto4h_dense_refactor(pname, p, hf_layer)
+                elif subname in [
+                        "self_attention.dense.weight",
+                        "mlp.dense_4h_to_h.weight"
+                ]:
+                    new_w = self._attn_dense_refactor(pname, p, hf_layer, subname)
+                elif subname in [
+                        "mlp.dense_h_to_4h1.weight",
+                        "mlp.dense_h_to_4h2.weight"
+                ]:
+                    new_w = self._mlphto4h1_refactor()
+                elif subname in [
+                        "input_layernorm.weight",
+                        "post_attention_layernorm.weight"
+                ]:
+                    new_w = self._direct_refactor(pname, p, hf_layer, subname)
+                else:
+                    raise ValueError("Unrecognized weight type")
+            p.data.copy_(new_w)
+            new_w = None
+        self.is_refactored = True
+
+    def record_mapping_info(self, record_msg):
+        self.refactor_weight_list.append(record_msg)
+
+    def inorder_show_record(self):
+        assert self.is_refactored
+        print_rank_0(
+            f"----------------------------mapping list----------------------------")
+        # print dp rank0 tp rank0  records.
+        for pipe_rank in range(mpu.get_pipeline_model_parallel_world_size()):
+            if mpu.get_pipeline_model_parallel_rank() == pipe_rank:
+                if mpu.get_data_parallel_rank(
+                ) == 0 and mpu.get_tensor_model_parallel_rank() == 0:
+                    for record in self.refactor_weight_list:
+                        print(record)
+                torch.distributed.barrier()
+            else:
+                torch.distributed.barrier()
 
 
 def convert_hf_to_mega_ds():
@@ -280,18 +299,11 @@ def convert_hf_to_mega_ds():
     print_distinct_weights(model)
 
     # refactor weight from hf to mega-ds
-    refactor_record = refactor_and_record_weight(model, loaded, args, config)
-    print_rank_0(f"----------------------------mapping list----------------------------")
-    # print dp rank0 tp rank0  records.
-    for pipe_rank in range(mpu.get_pipeline_model_parallel_world_size()):
-        if mpu.get_pipeline_model_parallel_rank() == pipe_rank:
-            if mpu.get_data_parallel_rank() == 0 and mpu.get_tensor_model_parallel_rank(
-            ) == 0:
-                for record in refactor_record:
-                    print(record)
-            torch.distributed.barrier()
-        else:
-            torch.distributed.barrier()
+
+    cur_refactor = refactor(model, loaded, args, config)
+    cur_refactor.refactor()
+    cur_refactor.inorder_show_record()
+
     del loaded
 
     unwrapped_model = unwrap_model([model], (torchDDP, LocalDDP, Float16Module))
