@@ -347,4 +347,4 @@ if __name__ == "__main__":
              model_provider,
              ModelType.encoder_or_decoder,
              forward_step,
-             data_post_process=None)
+             data_post_process=data_post_process)
