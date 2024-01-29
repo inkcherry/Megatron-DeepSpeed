@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +29,6 @@ torch._C._jit_override_can_fuse_on_gpu(True)
 # actual gelu is:
 # x * 0.5 * (1.0 + torch.erf(x * 0.70710678))
 
-@torch.jit.script
 def bias_gelu(bias, y):
     x = bias + y
     return  x * 0.5 * (1.0 + torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
@@ -36,7 +36,6 @@ def bias_gelu(bias, y):
 # gradient of tanh approximation of gelu
 # gradient of actual gelu is:
 # 0.5 * (1. + torch.erf(x * 0.70710678)) + 0.3989423 * x * torch.exp(-0.5 * x * x)
-@torch.jit.script
 def bias_gelu_back(g, bias, y):
     x = bias + y
     tanh_out = torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x))
@@ -44,17 +43,31 @@ def bias_gelu_back(g, bias, y):
     ff = 0.5 * x * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * x * x)) + 0.5 * (1 + tanh_out)
     return ff*g
 
+@torch.jit.script
+def bias_gelu_gpu(bias, y):
+    return bias_gelu(bias, y)
+
+@torch.jit.script
+def bias_gelu_back_gpu(g, bias, y):
+    return bias_gelu_back(g, bias, y)
+
 class GeLUFunction(torch.autograd.Function):
     @staticmethod
     # bias is an optional argument
     def forward(ctx, input, bias):
         ctx.save_for_backward(input, bias)
-        return bias_gelu(bias, input)
+        if torch.cuda.is_available():
+            return bias_gelu_gpu(bias, input)
+        else:
+            return bias_gelu(bias, input)
 
     @staticmethod
     def backward(ctx, grad_output):
         input, bias = ctx.saved_tensors
-        tmp = bias_gelu_back(grad_output, bias, input)
+        if torch.cuda.is_available():
+            tmp = bias_gelu_back_gpu(grad_output, bias, input)
+        else:
+            tmp = bias_gelu_back(grad_output, bias, input)
         return tmp, tmp
 
 bias_gelu_impl = GeLUFunction.apply

@@ -8,6 +8,7 @@ from megatron import get_args, get_tokenizer, mpu, print_rank_0
 from megatron.data.dataset_utils import create_masked_lm_predictions, \
                                             pad_and_convert_to_numpy
 from megatron.data.data_samplers import MegatronPretrainingSampler
+from megatron.global_vars import get_current_device
 
 def make_attention_mask(source_block, target_block):
     """
@@ -24,6 +25,8 @@ def get_one_epoch_dataloader(dataset, micro_batch_size=None):
     """Specifically one epoch to be used in an indexing job."""
     args = get_args()
 
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+           "get_one_epoch_dataloader (biencoder) - Unsupported for split micro batch size"
     if micro_batch_size is None:
         micro_batch_size = args.micro_batch_size
     num_workers = args.num_workers
@@ -35,9 +38,10 @@ def get_one_epoch_dataloader(dataset, micro_batch_size=None):
     batch_sampler = MegatronPretrainingSampler(
         total_samples=len(dataset),
         consumed_samples=0,
-        micro_batch_size=args.micro_batch_size,
+        micro_batch_size=micro_batch_size,
         data_parallel_rank=mpu.get_data_parallel_rank(),
         data_parallel_size=mpu.get_data_parallel_world_size(),
+        is_train=False,
         drop_last=False)
 
     return torch.utils.data.DataLoader(dataset,
@@ -187,7 +191,7 @@ def get_block_samples_mapping(block_dataset, title_dataset, data_prefix, num_epo
     # This should be a barrier but nccl barrier assumes
     # device_index=rank which is not the case for model
     # parallel case
-    counts = torch.cuda.LongTensor([1])
+    counts = torch.IntTensor([1]).to(get_current_device())
     torch.distributed.all_reduce(counts, group=mpu.get_data_parallel_group())
     assert counts[0].item() == torch.distributed.get_world_size(
         group=mpu.get_data_parallel_group())

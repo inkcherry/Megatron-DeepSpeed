@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +21,9 @@ import os
 
 import torch
 import deepspeed
+
+from megatron.enums import PositionEmbeddingType
+
 
 def parse_args(extra_args_provider=None, defaults={},
                ignore_unknown_args=False):
@@ -46,6 +50,10 @@ def parse_args(extra_args_provider=None, defaults={},
     parser = _add_memoryopt_args(parser)
     parser = _add_activation_checkpoint_args(parser)
     parser = _add_distillation_args(parser)
+    parser = _add_tensor_logger_args(parser)
+    parser = _add_profiler_args(parser)
+    parser = _add_deterministic_args(parser)
+    parser = _add_hpu_optimizations_args(parser)
 
     # Custom arguments.
     if extra_args_provider is not None:
@@ -65,6 +73,9 @@ def parse_args(extra_args_provider=None, defaults={},
     # Distributed args.
     args.rank = int(os.getenv('RANK', '0'))
     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
+    if not args.local_rank and 'LOCAL_RANK' in os.environ:
+        args.local_rank = int(os.getenv("LOCAL_RANK", -1))
+
     # Tensor model parallel size.
     args.tensor_model_parallel_size = min(
         args.tensor_model_parallel_size, args.world_size)
@@ -128,6 +139,8 @@ def parse_args(extra_args_provider=None, defaults={},
             print('setting global batch size to {}'.format(
                 args.global_batch_size), flush=True)
     assert args.global_batch_size > 0
+    if args.eval_micro_batch_size is None:
+        args.eval_micro_batch_size = args.micro_batch_size
     if args.num_layers_per_virtual_pipeline_stage is not None:
         assert args.pipeline_model_parallel_size > 2, \
             'pipeline-model-parallel size should be greater than 2 with ' \
@@ -207,14 +220,13 @@ def parse_args(extra_args_provider=None, defaults={},
                 'and lr-warmup-samples'
 
     # Check required arguments.
-    required_args = ['num_layers', 'hidden_size', 'num_attention_heads',
-                     'max_position_embeddings']
+    required_args = ['num_layers', 'hidden_size', 'num_attention_heads']
     for req_arg in required_args:
         _check_arg_is_not_none(args, req_arg)
 
     # Checks.
     if args.ffn_hidden_size is None:
-        args.ffn_hidden_size = 4 * args.hidden_size
+        args.ffn_hidden_size = int(args.ffn_hidden_coeff * args.hidden_size)
 
     if args.kv_channels is None:
         assert args.hidden_size % args.num_attention_heads == 0
@@ -227,10 +239,27 @@ def parse_args(extra_args_provider=None, defaults={},
         assert args.encoder_seq_length is not None
         args.seq_length = args.encoder_seq_length
 
-    if args.seq_length is not None:
-        assert args.max_position_embeddings >= args.seq_length
-    if args.decoder_seq_length is not None:
-        assert args.max_position_embeddings >= args.decoder_seq_length
+    if args.position_embedding_type == PositionEmbeddingType.absolute \
+            or args.position_embedding_type == PositionEmbeddingType.alibi \
+            or args.position_embedding_type == PositionEmbeddingType.learnable:
+        assert args.max_position_embeddings is not None, "Must specify position embedding size"
+        if args.seq_length is not None:
+            assert args.max_position_embeddings >= args.seq_length, \
+                "Number of position embeddings can't be less than sequence length"
+        if args.decoder_seq_length is not None:
+            assert args.max_position_embeddings >= args.decoder_seq_length, \
+                "Number of position embeddings can't be less than decoder sequence length"
+    else:
+        assert args.max_position_embeddings is None, \
+            "Rotary method doesn't hold position embedding matrix, but a rotation matrix, \
+            which its size depends only on word embedding dimension"
+
+    if args.activation_func_type != 'gelu':
+        assert not args.openai_gelu, 'openai gelu cannot be used when \
+            specified activation function is not gelu'
+        assert not args.onnx_safe, 'workarounds for onnx-safe cannot be \
+            used when specified activation function is not gelu'
+
     if args.lr is not None:
         assert args.min_lr <= args.lr
     if args.save is not None:
@@ -246,6 +275,9 @@ def parse_args(extra_args_provider=None, defaults={},
         assert args.checkpoint_activations, \
             'for distribute-checkpointed-activations to work you '\
             'need to enable checkpoint-activations'
+        assert args.checkpoint_activations_granularity == 'full', \
+            'distributed recompute activations is only '\
+            'applicable to full checkpoint activations granularity'
 
     args.curriculum_learning = False
     args.compression_training = False
@@ -256,6 +288,23 @@ def parse_args(extra_args_provider=None, defaults={},
         for path in args.data_path:
             data_paths.append(f"{args.aml_data_download_path}/{path}")
         args.data_path = data_paths
+
+    # GQA
+    if args.num_key_value_heads is None:
+        args.num_key_value_heads = args.num_attention_heads
+    assert args.num_attention_heads % args.num_key_value_heads == 0, \
+        f"num_attention_heads must be divisible by num_key_value_heads (got `num_attention_heads`: {args.num_attention_heads} " \
+        f"and `num_key_value_heads`: {args.num_key_value_heads})."
+    if args.num_key_value_heads != args.num_attention_heads:
+        # if GQA
+        assert not args.mos, 'GQA currently does not support args.mos'
+        assert not args.kd, 'GQA currently does not support args.kd'
+
+    # disable sequence parallelism when tp=1
+    # to avoid change in numerics when
+    # sequence_parallelism is enabled.
+    if args.tensor_model_parallel_size == 1:
+        args.sequence_parallel = False
 
     _print_args(args)
     return args
@@ -297,9 +346,15 @@ def _add_network_size_args(parser):
                        help='Tansformer hidden size.')
     group.add_argument('--ffn-hidden-size', type=int, default=None,
                        help='Transformer Feed-Forward Network hidden size. '
-                       'This is set to 4*hidden-size if not provided')
+                       'This is set to ffn-hidden-coeff*hidden-size if not provided')
+    group.add_argument('--ffn-hidden-coeff', type=float, default=4,
+                       help='Transformer Feed-Forward Network hidden size coeff. '
+                       'ffn-hidden-size is set to ffn-hidden-coeff*hidden-size if --ffn-hidden-size is not provided. '
+                       'This coefficient is set to 4 if not provided')
     group.add_argument('--num-attention-heads', type=int, default=None,
                        help='Number of transformer attention heads.')
+    group.add_argument('--num-key-value-heads', type=int, default=None,
+                       help='Number of key_value heads that should be used to implement Grouped Query Attention.')
     group.add_argument('--kv-channels', type=int, default=None,
                        help='Projection weights dimension in multi-head '
                        'attention. This is set to '
@@ -313,10 +368,20 @@ def _add_network_size_args(parser):
                        'This is added for computational efficieny reasons.')
     group.add_argument('--layernorm-epsilon', type=float, default=1e-5,
                        help='Layer norm epsilon.')
+    group.add_argument('--apply-layernorm-weight-plus-one',
+                       action='store_true',
+                       help='If set, use layernorm weight as plus one (initialize layernorm weight to 0 instead of 1 and add 1 after loading the weight'
+                            'This is used for achieving better BF16 accuracy in the layernorm weight.')
     group.add_argument('--apply-residual-connection-post-layernorm',
                        action='store_true',
                        help='If set, use original BERT residula connection '
                        'ordering.')
+    group.add_argument('--embed-layernorm', action='store_true',
+                       help='use layernorm for embedding')
+    group.add_argument('--layernorm-type', type=str, default='layernorm',
+                       choices=['layernorm', 'rmsnorm'],
+                       help='What kind of layernorm to use in the model. Supported types are LayerNorm and RMSNorm.'
+                       'If not specified, each model is used with its default')
     group.add_argument('--openai-gelu', action='store_true',
                        help='Use OpenAIs GeLU implementation. This option'
                        'should not be used unless for backward compatibility'
@@ -324,9 +389,28 @@ def _add_network_size_args(parser):
     group.add_argument('--onnx-safe', type=bool, required=False,
                        help='Use workarounds for known problems with '
                        'Torch ONNX exporter')
+    group.add_argument('--activation-func-type', type=str, default='gelu',
+                       choices=['gelu', 'swiglu'],
+                       help='What kind of activation func to use in the model. Supported types are Gelu and SwiGLU.'
+                       'If not specified, each model is used with its default')
+    group.add_argument('--no-bias', action='store_true',
+                       help='Do not use bias in linear layers of attention and MLP')
     group.add_argument('--bert-no-binary-head', action='store_false',
                        help='Disable BERT binary head.',
                        dest='bert_binary_head')
+    group.add_argument('--position-embedding-type', type=lambda x: PositionEmbeddingType[x],
+                       choices=list(PositionEmbeddingType),
+                       default=PositionEmbeddingType.learnable,
+                       help='Define position embedding type '
+                       '("rotary" | "absolute" | "alibi" | "learnable"). "learnable" by default.')
+    group.add_argument('--use-rotary-v2', action='store_true',
+                       help='Use RotaryEmbeddingV2 instead of RotaryEmbedding for rotary positional embeddings')
+    group.add_argument('--fix-position-emb-redundant-alloc', action='store_true',
+                       help='If true, will not allocate position embeddings at '
+                       'the embed object that is used to generate logits.')
+    group.add_argument('--kill-switch-path', type=str, default=None,
+                       help='Path to look for a kill switch. '
+                            'If found will automatically exit the program.')
 
     return parser
 
@@ -390,7 +474,8 @@ def _add_regularization_args(parser):
                        'numerical stability')
     group.add_argument('--sgd-momentum', type=float, default=0.9,
                        help='Momentum factor for sgd')
-
+    group.add_argument('--do-layernorm-bias-weight-decay', action='store_true',
+                       help='Enable Weight Decay for LayerNorm (weight and bias) and non Bias Parameters')
     return parser
 
 
@@ -401,6 +486,9 @@ def _add_training_args(parser):
                        help='Batch size per model instance (local batch size). '
                        'Global batch size is local batch size times data '
                        'parallel size times number of micro batches.')
+    group.add_argument('--eval-micro-batch-size', type=int, default=None,
+                       help='Batch size per model instance (local batch size) for evaluation. '
+                       'If not defined, using --micro-batch-size value instead')
     group.add_argument('--batch-size', type=int, default=None,
                        help='Old batch size parameter, do not use. '
                        'Use --micro-batch-size instead')
@@ -426,12 +514,22 @@ def _add_training_args(parser):
     group.add_argument('--checkpoint-activations', action='store_true',
                        help='Checkpoint activation to allow for training '
                        'with larger models, sequences, and batch sizes.')
+    group.add_argument('--checkpoint-activations-granularity', type=str, default='full',
+                       choices=['full', 'selective'],
+                       help='Checkpoint activations to allow for training '
+                       'with larger models, sequences, and batch sizes. '
+                       'It is supported at two granularities 1) full: '
+                       'whole transformer layer is recomputed, '
+                       '2) selective: core attention part of the transformer '
+                       'layer is recomputed.')
     group.add_argument('--distribute-checkpointed-activations',
                        action='store_true',
                        help='If set, distribute checkpointed activations '
                        'across model parallel group.')
     group.add_argument('--checkpoint-num-layers', type=int, default=1,
                        help='chunk size (number of layers) for checkpointing.')
+    group.add_argument('--skip-train', action='store_true',
+                       help='If set, skips training.')
     group.add_argument('--train-iters', type=int, default=None,
                        help='Total number of iterations to train over all '
                        'training runs. Note that either train-iters or '
@@ -477,8 +575,8 @@ def _add_training_args(parser):
     group.add_argument('--create-moe-param-group', action='store_true',
                        help='Create separate groups for MoE params.'
                        'This is necessary for techniques like ZeRO.')
-    group.add_argument('--optimizer', type=str, default='adam',
-                       choices=['adam', 'sgd'],
+    group.add_argument('--optimizer', type=str, default='adamw',
+                       choices=['adam', 'sgd', 'adamw', 'fusedadamw'],
                        help='Optimizer function')
     group.add_argument('--dataloader-type', type=str, default=None,
                        choices=['single', 'cyclic'],
@@ -495,7 +593,8 @@ def _add_training_args(parser):
                        help='Use Tutel optimization for MoE')
     group.add_argument('--inference', action='store_true',
                        help='Very basic inference mode: not allocating optim/lr - requires ZERO_STAGE=0')
-
+    group.add_argument('--sequence-parallel', action='store_true',
+                       help='Enable sequence parallel optimization.')
     return parser
 
 
@@ -510,6 +609,10 @@ def _add_initialization_args(parser):
                        'distribution used for weight initialization.')
     group.add_argument('--init-method-xavier-uniform', action='store_true',
                        help='Enable Xavier uniform parameter initialization')
+    group.add_argument('--no-scaled-init', action='store_true',
+                       help='No scaled initialization with number of '
+                            'layers and have same init method for all the model '
+                            'parameters')
 
     return parser
 
@@ -562,6 +665,8 @@ def _add_learning_rate_args(parser):
                        '(learning rate, warmup iterations, minimum learning '
                        'rate, maximum number of iterations, and decay style '
                        'from checkpoint and ignore input arguments.')
+    group.add_argument('--universal-checkpoint', action='store_true',
+                       help='Loading a universal format checkpoint.')
 
     return parser
 
@@ -584,11 +689,15 @@ def _add_checkpointing_args(parser):
     group.add_argument('--no-load-rng', action='store_true', default=None,
                        help='Do not load rng state when loading checkpoint.')
     group.add_argument('--no-load-lr-state', action='store_true',
-                       help='Do not load lr state when loading checkpoint.')   
+                       help='Do not load lr state when loading checkpoint.')
     group.add_argument('--finetune', action='store_true',
                        help='Load model for finetuning. Do not load optimizer '
                        'or rng state from checkpoint and set iteration to 0. '
                        'Assumed when loading a release checkpoint.')
+    group.add_argument('--verify-checkpoint', action='store_true',
+                       help='run verification on saved checkpoint.')
+    group.add_argument("--verify-checkpoint-model-type", default='GPT', type=str,
+                       help='Type of Model',choices=['GPT', 'BLOOM', 'LLAMA'])
 
     return parser
 
@@ -649,7 +758,7 @@ def _add_distributed_args(parser):
     group.add_argument('--num-layers-per-virtual-pipeline-stage', type=int, default=None,
                        help='Number of layers per virtual pipeline stage')
     group.add_argument('--distributed-backend', default='nccl',
-                       choices=['nccl', 'gloo'],
+                       choices=['nccl', 'gloo', 'hccl'],
                        help='Which backend to use for distributed training.')
     group.add_argument('--DDP-impl', default='local',
                        choices=['local', 'torch'],
@@ -672,6 +781,10 @@ def _add_distributed_args(parser):
     group.add_argument('--use-cpu-initialization', action='store_true',
                        default=None, help='If set, affine parallel weights '
                        'initialization uses CPU' )
+    group.add_argument('--verify-tp-workers', action='store_true',
+                       help='run verification on TP workers intermediates.')
+    group.add_argument('--verify-tp-workers-hash', action='store_true',
+                       help='run hashing verification on TP workers intermediates.')
     return parser
 
 
@@ -684,6 +797,10 @@ def _add_validation_args(parser):
     group.add_argument('--eval-interval', type=int, default=1000,
                        help='Interval between running evaluation on '
                        'validation set.')
+    group.add_argument('--do-pretrain-validation', action='store_true',
+                        help="run validation before starting the training")
+    group.add_argument('--eval-loss-exit-value', type=float, default=None,
+                       help='Eval loss value below which the training will exit')
 
     return parser
 
@@ -695,9 +812,26 @@ def _add_data_args(parser):
                        help='Path to mounted input dataset')
     group.add_argument('--data-path', nargs='*', default=None,
                        help='Path to the training dataset. Accepted format:'
-                       '1) a single data path, 2) multiple datasets in the'
-                       'form: dataset1-weight dataset1-path dataset2-weight '
-                       'dataset2-path ...')
+                            '1) a single data path, 2) multiple datasets in the'
+                            'form: dataset1-weight dataset1-path dataset2-weight '
+                            'dataset2-path ...')
+    group.add_argument('--data-idx-path', type=str, default=None,
+                       help='Path to the directory where idx files are stored (should be read/write)')
+    group.add_argument('--train-data-path', nargs='*', default=None,
+                       help='Path to the training dataset. Accepted format:'
+                            '1) a single data path, 2) multiple datasets in the'
+                            'form: dataset1-weight dataset1-path dataset2-weight '
+                            'dataset2-path ...')
+    group.add_argument('--valid-data-path', nargs='*', default=None,
+                       help='Path to the validation dataset. Accepted format:'
+                            '1) a single data path, 2) multiple datasets in the'
+                            'form: dataset1-weight dataset1-path dataset2-weight '
+                            'dataset2-path ...')
+    group.add_argument('--test-data-path', nargs='*', default=None,
+                       help='Path to the test dataset. Accepted format:'
+                            '1) a single data path, 2) multiple datasets in the'
+                            'form: dataset1-weight dataset1-path dataset2-weight '
+                            'dataset2-path ...')
     group.add_argument('--split', type=str, default='969, 30, 1',
                        help='Comma-separated list of proportions for training,'
                        ' validation, and test split. For example the split '
@@ -725,6 +859,8 @@ def _add_data_args(parser):
                             ' < sample_rate < 1')
     group.add_argument('--mask-prob', type=float, default=0.15,
                        help='Probability of replacing a token with mask.')
+    group.add_argument('--mask-tensor-adding', action='store_true',
+                       help='Perform attention masking by adding tensor instead of doing fill')
     group.add_argument('--short-seq-prob', type=float, default=0.1,
                        help='Probability of producing a short sequence.')
     group.add_argument('--mmap-warmup', action='store_true',
@@ -735,7 +871,9 @@ def _add_data_args(parser):
                        default=None,
                        choices=['BertWordPieceLowerCase',
                                 'BertWordPieceCase',
-                                'GPT2BPETokenizer'],
+                                'GPT2BPETokenizer',
+                                'SentencePieceTokenizer',
+                                'LlamaTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--data-impl', type=str, default='infer',
                        choices=['lazy', 'cached', 'mmap', 'infer'],
@@ -743,10 +881,18 @@ def _add_data_args(parser):
     group.add_argument('--reset-position-ids', action='store_true',
                        help='Reset posistion ids after end-of-document token.')
     group.add_argument('--reset-attention-mask', action='store_true',
-                       help='Reset self attention maske after '
+                       help='Reset self attention mask after '
                        'end-of-document token.')
     group.add_argument('--eod-mask-loss', action='store_true',
                        help='Mask loss for the end of document tokens.')
+    group.add_argument('--no-seq-len-plus-one-tokens',
+                       action='store_false', help='If set, dont get '
+                       'sequence length plus one tokens for training',
+                       dest='use_seq_len_plus_one_tokens')
+    group.add_argument('--tokenizer-model-file', type=str, default=None,
+                       help='Path to tokenizer model file, where applicable (e.g. SentencePiece)')
+    group.add_argument('--tokenizer-eod-id', type=int, default=None,
+                       help='End of document token id, where applicable (e.g. SentencePiece)')
 
     return parser
 
@@ -831,6 +977,9 @@ def _add_vit_args(parser):
                        help='Number of channels in input image data')
     group.add_argument('--patch-dim', type=int, default=16,
                        help='patch dimension used in vit')
+    group.add_argument('--no-data-sharding', action='store_false',
+                       help='Disable data sharding.',
+                       dest='data_sharding')
 
     return parser
 
@@ -894,15 +1043,15 @@ def _add_activation_checkpoint_args(parser):
 def _add_distillation_args(parser):
     group = parser.add_argument_group('Knowledge distillation',
                                       'Distillation Configurations')
-    
+
     group.add_argument('--num-layers-teacher', type=int, default=None,
-                       help='Number of the teacher transformer layers.')                  
+                       help='Number of the teacher transformer layers.')
     group.add_argument('--num-experts-teacher', type=int, nargs='+', default=[1,],
                         help='number of teacher experts list, MoE related.')
     group.add_argument('--hidden-size-teacher', type=int, default=None,
                        help='Tansformer teacher hidden size.')
     group.add_argument('--num-attention-heads-teacher', type=int, default=None,
-                       help='Number of teacher transformer attention heads.') 
+                       help='Number of teacher transformer attention heads.')
 
     group.add_argument('--mos', action='store_true',
                        help='Enable Mixture-of-Students via knolwedge distillation.')
@@ -913,8 +1062,131 @@ def _add_distillation_args(parser):
     group.add_argument('--kd-temp', default=1.0, type=float)
     group.add_argument('--reset-iteration', action='store_true',
                     help='Reset the iteration count.')
-    
     group.add_argument('--load-teacher', type=str, default=None,
                        help='Directory containing a teacher model checkpoint.')
+
+    return parser
+
+def _add_tensor_logger_args(parser):
+    group = parser.add_argument_group(title='tensor-logger logging configuration')
+
+    group.add_argument("--log-model-inputs",
+     action="store_true",
+      help="If set, log model\'s inputs for configured iterations")
+
+    group.add_argument("--log-fwd-activations",
+     action="store_true",
+      help="If set, log model\'s nn.Module forward activations for configured iterations")
+
+    group.add_argument("--log-bwd-grads",
+     action="store_true",
+      help="If set, log model\'s nn.Module backward gradients for configured iterations")
+
+    group.add_argument("--tensor-logger-max-iter",
+     type=int,
+     default=0,
+     help="Sets the maximum number of iterations to capture. If 0, disable tensor logger")
+
+    group.add_argument("--tensor-logger-path",
+     type=str,
+     default=None,
+     help="Path for saving tensor logger captured tensors file")
+
+    group.add_argument("--clearml-config-path",
+     type=str,
+     default=None,
+     help="Path for clearml config file")
+
+    group.add_argument("--clearml-exp-name",
+     type=str,
+     default=None,
+     help="Experiment name for clearml")
+
+    group.add_argument("--clearml-continue-exp", action='store_true',
+     help="if indicated, will try to continue the previous experiment with the same name. \
+           If fail, create new experiment")
+
+    return parser
+
+def _add_profiler_args(parser):
+    group = parser.add_argument_group(title='profiling configuration')
+
+    group.add_argument("--profile",
+     type=str,
+     default=None,
+     choices=['pt', 'pt-full', 'hltv'],
+     help="Enable profiling")
+
+    group.add_argument("--profile-steps",
+     type=str,
+     default='2,3',
+     help="Which steps to profile. Format: <start step>,<end step>")
+
+    return parser
+
+def _add_deterministic_args(parser):
+    group = parser.add_argument_group(title='deterministic configuration')
+
+    group.add_argument("--hpu-deterministic", action='store_true',
+                        help="sets deterministic flag run for hpu")
+
+    return parser
+
+def _add_hpu_optimizations_args(parser):
+    group = parser.add_argument_group(title='fp8 configuration')
+
+    group.add_argument('--use-hpu-fp8-transformer-engine',
+                        default=False,
+                        action='store_true',
+                        help='Enable FP8 layers')
+
+    group.add_argument('--use-fused-sdpa',
+                        type=lambda x: x.lower() in ['true', '1'],
+                        default=False,
+                        help='Enable Fused Scaled Dot Product Attention.')
+
+    group.add_argument('--use-fused-sdpa-with-recompute',
+                        type=lambda x: x.lower() in ['true', '1'],
+                        default=False,
+                        help='Enable Fused Scaled Dot Product Attention with recompute feature.')
+
+    group.add_argument('--use-hpu-graphs',
+                        type=lambda x: x.lower() in ['true', '1'],
+                        default=False,
+                        help='Enable hpu graphs')
+
+    group.add_argument('--use-torch-compile',
+                        type=lambda x: x.lower() in ['true', '1'],
+                        default=False,
+                        help='Enable torch compile with hpu backend')
+
+    group.add_argument('--cache-fp8-weight',
+                       default=False,
+                       action='store_true',
+                       help='Cache fp8 weight from forward to backward. \
+                           This will increase memory usage, but improve performance.')
+
+    group.add_argument('--cache-fp8-weight-fwd',
+                       type=lambda x: x.lower() in ['true', '1'],
+                       default=True,
+                       help='In forward, calculate fp8 weight only once for the entire batch.')
+
+    group.add_argument('--hpu-fp8-measure-interval',
+                       type=int,
+                       default=10,
+                       help='Amax measurement interval for transformer engine')
+
+    group.add_argument('--flatten-linear-operands',
+                       default=False,
+                       action='store_true',
+                       help='Flatten operands of linear layers what yields better performance')
+
+    group.add_argument('--hpu-fp8-format',
+                        type=str,
+                        default='e5m2',
+                        choices=['e5m2', 'hybrid'],
+                        help='''FP8 format, default: e5m2, possible choices are:
+                        1) e5m2: e5m2 fwd+bwd,
+                        2) hybrid: e4m3 fwd, e5m2 bwd''')
 
     return parser

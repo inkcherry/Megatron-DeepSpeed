@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,10 +17,12 @@
 """Gradient clipping."""
 
 import torch
-from torch._six import inf
+from torch import inf
+from megatron import get_args
 
-from apex.multi_tensor_apply import multi_tensor_applier
-import amp_C
+if (torch.cuda.is_available()):
+    from apex.multi_tensor_apply import multi_tensor_applier
+    import amp_C
 
 from megatron import mpu
 from megatron.model.module import param_is_not_shared
@@ -61,7 +64,7 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
         grad = param.grad.detach()
         if grad_not_none:
             # Make sure the grads are in fp32
-            assert param.grad.type() == 'torch.cuda.FloatTensor'
+            assert param.grad.dtype == torch.float32
             grads.append(grad)
         if grad_not_none and is_not_shared and is_not_tp_duplicate:
             grads_for_norm.append(grad)
@@ -71,10 +74,11 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
     norm_type = float(norm_type)
     total_norm = 0.0
 
+    args = get_args()
     # Calculate norm.
     if norm_type == inf:
         total_norm = max(grad.abs().max() for grad in grads_for_norm)
-        total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
+        total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)]).to(args.device)
         # Take max across all model-parallel GPUs.
         torch.distributed.all_reduce(total_norm_cuda,
                                      op=torch.distributed.ReduceOp.MAX,
@@ -82,7 +86,8 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
         total_norm = total_norm_cuda[0].item()
 
     else:
-        if norm_type == 2.0:
+        # TODO SW-56092: not having multi_tensor_applier implementation outside CUDA
+        if args.device.type == "cuda" and norm_type == 2.0:
             dummy_overflow_buf = torch.cuda.IntTensor([0])
             # Use apex's multi-tensor applier for efficiency reasons.
             # Multi-tensor applier takes a function and a list of list
@@ -111,11 +116,15 @@ def clip_grad_norm_fp32(parameters, max_norm, norm_type=2):
     # Scale.
     clip_coeff = max_norm / (total_norm + 1.0e-6)
     if clip_coeff < 1.0:
-        dummy_overflow_buf = torch.cuda.IntTensor([0])
-        multi_tensor_applier(amp_C.multi_tensor_scale,
-                             dummy_overflow_buf,
-                             [grads, grads],
-                             clip_coeff)
+        if args.device.type == "cuda":
+            dummy_overflow_buf = torch.cuda.IntTensor([0])
+            multi_tensor_applier(amp_C.multi_tensor_scale,
+                                 dummy_overflow_buf,
+                                [grads, grads],
+                                clip_coeff)
+        else:
+            for grad in grads: # NadavE GalH check if need to detach gradients.
+                grad.mul_(clip_coeff)
 
     return total_norm
 

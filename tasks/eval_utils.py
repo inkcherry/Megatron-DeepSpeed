@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -84,6 +85,8 @@ def calculate_correct_answers(name, model, dataloader,
     start_time = time.time()
     for m in model:
         m.eval()
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+            "calculate_correct_answers - Unsupported for split micro batch size"
     saved_micro_batch_size = args.micro_batch_size
     saved_global_batch_size = args.global_batch_size
 
@@ -151,6 +154,8 @@ def calculate_correct_answers(name, model, dataloader,
             actual_batch_size = len(batch['label'])
             # ... applying sample_multiplier if necessary
             args.micro_batch_size = actual_batch_size * sample_multiplier
+            # Next line should be considered once eval_micro_batch_size is supported here
+            args.eval_micro_batch_size = args.micro_batch_size
             args.global_batch_size = actual_batch_size * sample_multiplier * num_micro_batches
 
             loss_dicts = forward_backward_func(correct_answers_forward_step, batch, model,
@@ -168,6 +173,8 @@ def calculate_correct_answers(name, model, dataloader,
     for m in model:
         m.train()
     args.micro_batch_size = saved_micro_batch_size
+    # Next line should be considered once eval_micro_batch_size is supported here
+    args.eval_micro_batch_size = args.micro_batch_size
     args.global_batch_size = saved_global_batch_size
 
     # Reduce.

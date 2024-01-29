@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +20,7 @@ import math
 
 import torch
 
-from megatron import get_args
+from megatron import mpu, get_args
 
 def init_method_normal(sigma):
     """Init method based on N(0, sigma)."""
@@ -38,6 +39,11 @@ def scaled_init_method_normal(sigma, num_layers):
 
     return init_
 
+def perform_masking(attention_scores, attention_mask):
+    if attention_mask.dtype == torch.bool:
+        attention_scores.masked_fill_(attention_mask, -10000.0)
+    else:
+        attention_scores.add_(attention_mask)
 
 def attention_mask_func(attention_scores, attention_mask):
     args = get_args()
@@ -47,9 +53,10 @@ def attention_mask_func(attention_scores, attention_mask):
         if actual_seqlen != attention_mask_.size()[2]:
             # attention_mask has size [1, 1, seqlen, seqlen]
             attention_mask_ = attention_mask_[:, :, :actual_seqlen, :actual_seqlen].contiguous()
-        attention_scores.masked_fill_(attention_mask_, -10000.0)
+        perform_masking(attention_scores, attention_mask_)
     else:
-        attention_scores.masked_fill_(attention_mask, -10000.0)
+        perform_masking(attention_scores, attention_mask)
+
     return attention_scores
 
 
@@ -62,14 +69,56 @@ def get_linear_layer(rows, columns, init_method):
     return layer
 
 @torch.jit.script
-def gelu_impl(x):
+def gelu_impl_gpu(x):
     """OpenAI's gelu implementation."""
     return 0.5 * x * (1.0 + torch.tanh(0.7978845608028654 * x *
                                        (1.0 + 0.044715 * x * x)))
+
+def gelu_impl(x):
+    """OpenAI's gelu implementation."""
+    return 0.5 * x * (1.0 + torch.tanh(0.7978845608028654 * x *
+                                        (1.0 + 0.044715 * x * x)))
+
 def openai_gelu(x):
-    return gelu_impl(x)
+    if torch.cuda.is_available():
+        return gelu_impl_gpu(x)
+    else:
+        return gelu_impl(x)
 
 #This is actually Python equivalent of torch.nn.functional.gelu(), also with type hints for ONNX exporter
 @torch.jit.script
-def erf_gelu(x):
+def erf_gelu_impl_gpu(x):
     return x * 0.5 * (torch.erf(x / 1.41421).to(dtype=x.dtype)+torch.ones_like(x).to(dtype=x.dtype))
+
+def erf_gelu_impl(x):
+    return x * 0.5 * (torch.erf(x / 1.41421).to(dtype=x.dtype)+torch.ones_like(x).to(dtype=x.dtype))
+
+def erf_gelu(x):
+    if torch.cuda.is_available():
+        return erf_gelu_impl_gpu(x)
+    else:
+        return erf_gelu_impl(x)
+
+
+def CrossEntropy(output, labels):
+    labels, loss_mask = labels[0], labels[1]
+
+    args = get_args()
+
+    losses = mpu.vocab_parallel_cross_entropy(output.contiguous().float(), labels)
+    loss_mask = loss_mask.view(-1)
+    loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+    return loss
+
+
+class WrapName(torch.nn.Module):
+    def __init__(self, name='', module=None, *args, **kwargs):
+        super(WrapName, self).__init__()
+        self.name = name
+        if module is not None:
+            value = module(*args, **kwargs)
+            setattr(self, self.name, value)
+            self.forward_func = value.forward
+
+    def forward(self, inputs):
+        return self.forward_func(inputs)

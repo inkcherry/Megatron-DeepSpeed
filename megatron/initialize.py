@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +19,7 @@
 import random
 import os
 import time
+import shutil
 
 import numpy as np
 import torch
@@ -29,7 +31,8 @@ from megatron import get_tensorboard_writer
 from megatron import mpu
 from megatron.global_vars import set_global_variables
 from megatron.mpu import (set_tensor_model_parallel_rank,
-                          set_tensor_model_parallel_world_size)
+                          set_tensor_model_parallel_world_size,
+                          _set_global_memory_buffer)
 
 import deepspeed
 import deepspeed.utils.groups as groups
@@ -38,15 +41,12 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
                         ignore_unknown_args=False, allow_no_cuda=False):
     """Set global variables, initialize distributed, and
     set autoresume and random seeds.
-    `allow_no_cuda` should not be set unless using megatron for cpu only 
-    data processing. In general this arg should not be set unless you know 
+    `allow_no_cuda` should not be set unless using megatron for cpu only
+    data processing. In general this arg should not be set unless you know
     what you are doing.
-    Returns a function to finalize distributed env initialization 
+    Returns a function to finalize distributed env initialization
     (optionally, only when args.lazy_mpu_init == True)
     """
-    if not allow_no_cuda:
-        # Make sure cuda is available.
-        assert torch.cuda.is_available(), 'Megatron requires CUDA.'
 
     # Parse args, build tokenizer, and set adlr-autoresume,
     # tensorboard-writer, and timers.
@@ -54,26 +54,41 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
                          args_defaults=args_defaults,
                          ignore_unknown_args=ignore_unknown_args)
 
+    args = get_args()
+    if os.getenv("P2P_DUMMY_MODE_PHASE") != "2":
+        if args.world_size != 1 and os.getenv("HLS_MODULE_ID") is None:
+            if args.local_rank == None:
+                print("Non-existent HLS_MODULE_ID provided: Setting env var HLS_MODULE_ID=0")
+                os.environ["HLS_MODULE_ID"] = "0"
+            else:
+                print("Non-existent HLS_MODULE_ID provided: Setting env var HLS_MODULE_ID=", args.local_rank)
+                os.environ["HLS_MODULE_ID"] = str(args.local_rank)
+
+    # profiler config, must be done before hpu initialization
+    if args.profile is not None:
+        os.environ['HABANA_PROFILE'] = 'profile_api_with_nics'
+        shutil.rmtree('.graph_dumps', ignore_errors=True)
+
+
     # torch.distributed initialization
     def finish_mpu_init():
         args = get_args()
         # Pytorch distributed.
         _initialize_distributed()
-        
+
         # Random seeds for reproducibility.
         if args.rank == 0:
             print('> setting random seeds to {} ...'.format(args.seed))
         _set_random_seed(args.seed)
 
-    args = get_args()
     if  args.lazy_mpu_init:
         args.use_cpu_initialization=True
         # delayed initialization of DDP-related stuff
-        # We only set basic DDP globals    
+        # We only set basic DDP globals
         set_tensor_model_parallel_world_size(args.tensor_model_parallel_size)
         # and return function for external DDP manager
         # to call when it has DDP initialized
-        set_tensor_model_parallel_rank(args.rank)    
+        set_tensor_model_parallel_rank(args.rank)
         return finish_mpu_init
     else:
         # Megatron's MPU is the master. Complete initialization right away.
@@ -81,7 +96,10 @@ def initialize_megatron(extra_args_provider=None, args_defaults={},
 
         # Initialize memory buffers.
         _initialize_mem_buffs()
-        
+
+        # Initialize global memory buffer (used with sequence parallel)
+        _set_global_memory_buffer()
+
         # Autoresume.
         _init_autoresume()
 
@@ -100,7 +118,7 @@ def _compile_dependencies():
     # Compile dataset C++ code.
     # =========================
     # TODO: move this to ninja
-    if _is_rank_0():
+    if args.local_rank == 0:
         start_time = time.time()
         print('> compiling dataset index builder ...')
         from megatron.data.dataset_utils import compile_helper
@@ -129,16 +147,18 @@ def _compile_dependencies():
             print('WARNING: constraints for invoking optimized'
                   ' fused softmax kernel are not met. We default'
                   ' back to unfused kernel invocations.', flush=True)
-    
+
     # Always build on rank zero first.
     if _is_rank_0():
         start_time = time.time()
         print('> compiling and loading fused kernels ...', flush=True)
-        fused_kernels.load(args)
+        if args.device.type == 'cuda':
+            fused_kernels.load(args)
         torch.distributed.barrier()
     else:
         torch.distributed.barrier()
-        fused_kernels.load(args)
+        if args.device.type == 'cuda':
+            fused_kernels.load(args)
     # Simple barrier to make sure all ranks have passed the
     # compilation phase successfully before moving on to the
     # rest of the program. We think this might ensure that
@@ -180,11 +200,13 @@ def setup_deepspeed_random_and_activation_checkpointing(args):
     mpu.get_cuda_rng_tracker = deepspeed.checkpointing.get_cuda_rng_tracker
     mpu.model_parallel_cuda_manual_seed = deepspeed.checkpointing.model_parallel_cuda_manual_seed
 
+def update_wa_env_var(key, value):
+    if key not in os.environ.keys():
+        os.environ[key] = value
 
 def _initialize_distributed():
     """Initialize torch.distributed and mpu."""
     args = get_args()
-    device_count = torch.cuda.device_count()
     if torch.distributed.is_initialized():
 
         if args.rank == 0:
@@ -194,8 +216,28 @@ def _initialize_distributed():
         args.world_size = torch.distributed.get_world_size()
 
     else:
-        if args.rank == 0:
-            print('> initializing torch distributed ...', flush=True)
+        print("_initialize_distributed: Initializing with below params:")
+        print("args.local_rank:", args.local_rank)
+        print("args.world_size:", args.world_size)
+        print("args.rank:", args.rank)
+        # TODO SW-65249 need to align behavior between device types
+        device_count = None
+        print("args.distributed_backend:", args.distributed_backend)
+        if args.distributed_backend == 'hccl':
+            import habana_frameworks.torch as htcore
+            device_count = htcore.hpu.device_count()
+            if args.hpu_deterministic:
+                assert args.use_hpu, f"--hpu-deterministic supported only with --use-hpu flag"
+                htcore.hpu.setDeterministic(True)
+            print("hccl device_count: ", device_count)
+        elif args.distributed_backend == 'nccl':
+            device_count = torch.cuda.device_count()
+        elif args.distributed_backend == 'gloo':
+            # no limit of devices when working on CPU, setting 8.
+            device_count = int(os.getenv('GPUS_PER_NODE', '8'))
+        else:
+            assert False, f"Unsupported backend {args.distributed_backend}"
+
         # Manually set the device ids.
         if device_count > 0:
             device = args.rank % device_count
@@ -204,8 +246,23 @@ def _initialize_distributed():
                     'expected local-rank to be the same as rank % device-count.'
             else:
                 args.local_rank = device
+        else:
+            assert False, "Error: device_count is not positive"
 
-        torch.cuda.set_device(device) 
+        if args.distributed_backend == 'hccl':
+            device = torch.device('hpu')
+        elif args.distributed_backend == 'nccl':
+            torch.cuda.set_device(device)
+            device = torch.device('cuda')
+        elif args.distributed_backend == 'gloo':
+            device = torch.device('cpu')
+        else:
+            assert False, f"Unsupported backend {args.distributed_backend}"
+
+        args.device = device
+
+        if args.rank == 0:
+            print('> initializing torch distributed ...', flush=True)
 
         # Call the init process
         init_method = 'tcp://'
@@ -213,8 +270,10 @@ def _initialize_distributed():
         master_port = os.getenv('MASTER_PORT', '6000')
         init_method += master_ip + ':' + master_port
 
+        if args.distributed_backend == "hccl":
+            import habana_frameworks.torch.core
         if args.deepspeed or args.ds_inference:
-            deepspeed.init_distributed()
+            deepspeed.init_distributed(dist_backend=args.distributed_backend)
         else:
             torch.distributed.init_process_group(
                 backend=args.distributed_backend,
@@ -251,8 +310,9 @@ def _set_random_seed(seed_):
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
-        if torch.cuda.device_count() > 0:
-            mpu.model_parallel_cuda_manual_seed(seed)
+        if ((get_args().device.type == "cuda" and torch.cuda.device_count() > 0) or
+            (get_args().device.type == "hpu" and torch.hpu.device_count() > 0)):
+                mpu.model_parallel_cuda_manual_seed(seed)
     else:
         raise ValueError('Seed ({}) should be a positive integer.'.format(seed))
 

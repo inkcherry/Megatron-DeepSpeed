@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +28,10 @@ from megatron import (get_args,
                       mpu,
                       print_rank_0,
                       update_num_microbatches,
-                      utils)
+                      utils,
+                      get_tokenizer)
+from tools.convert_checkpoint import verify_checkpoint
+from megatron.enums import PositionEmbeddingType
 
 _CHECKPOINT_VERSION = None
 
@@ -62,7 +66,12 @@ def check_checkpoint_args(checkpoint_args):
         _compare('num_layers')
     _compare('hidden_size')
     _compare('num_attention_heads')
-    _compare('max_position_embeddings')
+    if args.num_key_value_heads != args.num_attention_heads:
+        _compare('num_key_value_heads')
+    _compare('position_embedding_type')
+    # with alibi we can change `max_position_embeddings`
+    if args.position_embedding_type != PositionEmbeddingType.alibi:
+        _compare('max_position_embeddings')
     if args.vocab_file:
         _compare('make_vocab_size_divisible_by')
         _compare('padded_vocab_size')
@@ -128,6 +137,7 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
         state_dict['checkpoint_version'] = 3.0
         state_dict['iteration'] = iteration
         state_dict['tokens'] = args.consumed_train_tokens
+        state_dict['checkpoint_info'] = _checkpoint_info()
 
         # DeepSpeed saves the model/optimizer/scheduler
         if not args.deepspeed:
@@ -150,7 +160,11 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
             state_dict['random_rng_state'] = random.getstate()
             state_dict['np_rng_state'] = np.random.get_state()
             state_dict['torch_rng_state'] = torch.get_rng_state()
-            state_dict['cuda_rng_state'] = torch.cuda.get_rng_state()
+            if get_args().device.type == "cuda":
+                state_dict['cuda_rng_state'] = torch.cuda.get_rng_state()
+            elif get_args().device.type == "hpu":
+                import habana_frameworks.torch.hpu.random as rand_hpu
+                state_dict['cuda_rng_state'] = rand_hpu.get_rng_state()
             state_dict['rng_tracker_states'] \
                 = mpu.get_cuda_rng_tracker().get_states()
 
@@ -169,7 +183,7 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
 
         # Saving is a collective communication
         checkpoint_name = get_checkpoint_name(args.save, iteration)
-        
+
         # Trim off the filename and mp_rank_* directory.
         for _ in range(3):
             checkpoint_name = os.path.dirname(checkpoint_name)
@@ -187,6 +201,18 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
 
     # And update the latest iteration
     if is_rank_0():
+        if args.verify_checkpoint:
+            ckpt_folder = os.path.join(args.save, f"global_step{iteration}")
+            prev_iter = iteration - args.save_interval
+            ckpt_ok = verify_checkpoint(ckpt_folder,args.verify_checkpoint_model_type,sequence_parallel=args.sequence_parallel)
+            if not ckpt_ok:
+                # Fix latest file to previous valid ckpt
+                with open(os.path.join(args.save, 'latest'), 'w') as fd:
+                    fd.write(f"global_step{prev_iter}")
+                raise RuntimeError(f"verify_checkpoint failed!!! {ckpt_folder}")
+            else:
+                print_rank_0(f"successfully passed ckpt validation: {ckpt_folder}")
+
         tracker_filename = get_checkpoint_tracker_filename(args.save)
         with open(tracker_filename, 'w') as f:
             f.write(str(iteration))
@@ -366,7 +392,8 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', strict=True
         assert args.consumed_valid_samples == 0
         if 'args' in state_dict:
             checkpoint_args = state_dict['args']
-            check_checkpoint_args(checkpoint_args)
+            if not args.universal_checkpoint:
+                check_checkpoint_args(checkpoint_args)
             args.consumed_train_samples = getattr(checkpoint_args,
                                                 'consumed_train_samples', 0)
             update_num_microbatches(consumed_samples=args.consumed_train_samples)
@@ -410,7 +437,11 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', strict=True
             random.setstate(state_dict['random_rng_state'])
             np.random.set_state(state_dict['np_rng_state'])
             torch.set_rng_state(state_dict['torch_rng_state'])
-            torch.cuda.set_rng_state(state_dict['cuda_rng_state'])
+            if get_args().device.type == "cuda":
+                torch.cuda.set_rng_state(state_dict['cuda_rng_state'])
+            elif get_args().device.type == "hpu":
+                import habana_frameworks.torch as htcore
+                htcore.hpu.random.set_rng_state(state_dict['cuda_rng_state'])
             # Check for empty states array
             if not state_dict['rng_tracker_states']:
                 raise KeyError
@@ -471,3 +502,13 @@ def load_biencoder_checkpoint(model, only_query_model=False,
         print(' successfully loaded {}'.format(checkpoint_name))
 
     return model
+
+
+def _checkpoint_info():
+    args = get_args()
+    tokenizer = get_tokenizer()
+
+    return {
+        "padded_vocab_size": args.padded_vocab_size,
+        "original_vocab_size": tokenizer.vocab_size,
+    }

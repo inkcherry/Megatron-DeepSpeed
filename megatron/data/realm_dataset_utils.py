@@ -7,6 +7,7 @@ import torch
 from megatron import mpu, print_rank_0
 from megatron.data.dataset_utils import create_masked_lm_predictions, pad_and_convert_to_numpy
 from megatron import get_args, get_tokenizer, print_rank_0, mpu
+from megatron.global_vars import get_current_device
 
 
 def get_one_epoch_dataloader(dataset, micro_batch_size=None):
@@ -15,6 +16,8 @@ def get_one_epoch_dataloader(dataset, micro_batch_size=None):
 
     world_size = mpu.get_data_parallel_world_size()
     rank = mpu.get_data_parallel_rank()
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+        "get_one_epoch_dataloader (realm) - Unsupported for split micro batch size"
     if micro_batch_size is None:
         micro_batch_size = args.micro_batch_size
     global_batch_size = micro_batch_size * world_size
@@ -177,7 +180,7 @@ def get_block_samples_mapping(block_dataset, title_dataset, data_prefix, num_epo
     # This should be a barrier but nccl barrier assumes
     # device_index=rank which is not the case for model
     # parallel case
-    counts = torch.cuda.LongTensor([1])
+    counts = torch.IntTensor([1]).to(get_current_device())
     torch.distributed.all_reduce(counts, group=mpu.get_data_parallel_group())
     assert counts[0].item() == torch.distributed.get_world_size(
         group=mpu.get_data_parallel_group())

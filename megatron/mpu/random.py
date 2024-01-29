@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,11 +27,14 @@ from torch.utils.checkpoint import detach_variable
 
 from megatron import get_args
 from megatron.memory import allocate_mem_buff
+from megatron.global_vars import get_current_device_index
 
 from .initialize import get_data_parallel_rank
 from .initialize import get_tensor_model_parallel_group
 from .initialize import get_tensor_model_parallel_rank
 from .initialize import get_tensor_model_parallel_world_size
+
+import copy
 
 
 # Default name for the model parallel rng tracker.
@@ -45,6 +49,8 @@ def init_checkpointed_activations_memory_buffer():
     """Initializ the memory buffer for the checkpointed activations."""
     args = get_args()
 
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+                "init_checkpointed_activations_memory_buffer - Unsupported for split micro batch size"
     per_layer = args.micro_batch_size * args.max_position_embeddings * \
                 args.hidden_size // args.tensor_model_parallel_size
     assert args.num_layers % args.checkpoint_num_layers == 0, \
@@ -94,7 +100,7 @@ def _set_cuda_rng_state(new_state, device=-1):
         def cb():
             idx = device.index
             if idx is None:
-                idx = torch.cuda.current_device()
+                idx = get_current_device_index()
             default_generator = torch.cuda.default_generators[idx]
             default_generator.set_state(new_state)
 
@@ -195,14 +201,136 @@ class CudaRNGStatesTracker:
             # And set the state to the original state we started with.
             _set_cuda_rng_state(orig_cuda_rng_state)
 
+def _set_hpu_rng_state(new_state, device=-1):
+    """Sets the random number generator state of the current HPU.
 
-# RNG tracker object.
-_CUDA_RNG_STATE_TRACKER = CudaRNGStatesTracker()
+    Arguments:
+        new_state (torch.ByteTensor): The desired state
+    This function is adapted from PyTorch repo (torch.set_rng_state)
+    with a single change: the input state is not cloned. Cloning caused
+    major performance issues for +4 HPU cases.
+    """
+    # newer PyTorch
+    if device == -1:
+        device = torch.device('hpu')
+    elif isinstance(device, str):
+        device = torch.device(device)
+    elif isinstance(device, int):
+        device = torch.device('hpu', device)
 
+    def cb():
+        import habana_frameworks.torch.hpu as _hpu
+        idx = device.index
+        if idx is None:
+            idx = _hpu.current_device()
+        default_generator = _hpu.random.default_generators[idx]
+        default_generator.set_state(new_state)
+
+    cb()
+
+class RNGStatesTracker:
+    """Tracker for the device RNG states.
+
+    Using the `add` method, a device rng state is initialized based on
+    the input `seed` and is assigned to `name`. Later, by forking the
+    rng state, we can perform operations and return to our starting
+    device state.
+    """
+    def __init__(self):
+
+        self.device_initialized = False
+        # Map from a string name to the device rng state.
+        self.states_ = {}
+        # Seeds are just for book keeping and ensure no seed is set twice.
+        self.seeds_ = set()
+    @staticmethod
+    def get_state_fnc(device = 'hpu'):
+        import habana_frameworks.torch.hpu.random as hpu_random
+        return hpu_random.get_rng_state(device)
+    @staticmethod
+    def set_state_fnc(new_state: torch.Tensor, device = 'hpu'):
+        import habana_frameworks.torch.hpu.random as hpu_random
+        return hpu_random.set_rng_state(new_state, device)
+    @staticmethod
+    def manual_seed(seed) -> torch._C.Generator:
+        import habana_frameworks.torch.hpu.random as hpu_random
+        return hpu_random.manual_seed(seed)
+    @staticmethod
+    def set_rng_state(new_state, device=-1):
+        return _set_hpu_rng_state(new_state, device)
+
+    def reset(self):
+        """Set to the initial state (no tracker)."""
+        self.states_ = {}
+        self.seeds_ = set()
+
+    def get_states(self):
+        """Get rng states. Copy the dictionary so we have direct
+        pointers to the states, not just a pointer to the dictionary."""
+        return copy.copy(self.states_)
+
+    def set_states(self, states):
+        """Set the rng states. For efficiency purposes, we do not check
+        the size of seed for compatibility."""
+        self.states_ = states
+
+    def add(self, name, seed):
+        """Track the rng state."""
+        # Check seed is not already used.
+        if seed in self.seeds_:
+            raise Exception('seed {} already exists'.format(seed))
+        self.seeds_.add(seed)
+        # Check that state is not already defined.
+        if name in self.states_:
+            raise Exception('device rng state {} already exists'.format(name))
+        # Get the current rng state.
+        orig_rng_state = self.get_state_fnc()
+        # Set the new state and store it.
+        self.manual_seed(seed)
+        self.states_[name] = self.get_state_fnc()
+        # Reset rng state to what it was.
+        self.set_rng_state(orig_rng_state)
+
+    @contextlib.contextmanager
+    def fork(self, name=_MODEL_PARALLEL_RNG_TRACKER_NAME):
+        """Fork the device rng state, perform operations, and exit with
+        the original state."""
+        # Check if we have added the state
+        if name not in self.states_:
+            raise Exception('device rng state {} is not added'.format(name))
+        # Store current rng state.
+        orig_device_rng_state = self.get_state_fnc()
+        # Set rng state to the desired one
+        self.set_rng_state(self.states_[name])
+        # Do the stuff we wanted to do.
+        try:
+            yield
+        finally:
+            # Update the current rng state for later use.
+            self.states_[name] = self.get_state_fnc()
+            # And set the state to the original state we started with.
+            self.set_rng_state(orig_device_rng_state)
+
+
+class RNGStatesTrackerSingleton:
+    tracker = None
+    def __new__(self):
+        if not hasattr(self, 'instance'):
+            self.instance = super().__new__(self)
+        return self.instance
+
+    def get(self):
+        if not self.tracker:
+            if get_args().use_hpu:
+                self.tracker = RNGStatesTracker()
+            else:
+                self.tracker = CudaRNGStatesTracker()
+        return self.tracker
 
 def get_cuda_rng_tracker():
     """Get cuda rng tracker."""
-    return _CUDA_RNG_STATE_TRACKER
+    t = RNGStatesTrackerSingleton()
+    return t.get()
 
 
 def model_parallel_cuda_manual_seed(seed):
@@ -235,11 +363,11 @@ def model_parallel_cuda_manual_seed(seed):
                   torch.distributed.get_rank(), get_tensor_model_parallel_rank(),
                   get_data_parallel_rank(), tensor_model_parallel_seed,
                   data_parallel_seed), flush=True)
-    _CUDA_RNG_STATE_TRACKER.reset()
+    get_cuda_rng_tracker().reset()
     # Set the default state.
     torch.cuda.manual_seed(data_parallel_seed)
     # and model parallel state.
-    _CUDA_RNG_STATE_TRACKER.add(_MODEL_PARALLEL_RNG_TRACKER_NAME,
+    get_cuda_rng_tracker().add(_MODEL_PARALLEL_RNG_TRACKER_NAME,
                                 tensor_model_parallel_seed)
 
 

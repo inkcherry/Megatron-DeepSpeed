@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import torch
 from .fused_layer_norm import MixedFusedLayerNorm as LayerNorm
+from .rmsnorm import RMSNorm
+from .utils import CrossEntropy
 
 from .distributed import DistributedDataParallel
 from .bert_model import BertModel
 from .gpt_model import GPTModel, GPTModelPipe
+from .llama_model import LLaMAModel, LLaMAModelPipe
 from .t5_model import T5Model
 from .language_model import get_language_model
 from .module import Float16Module

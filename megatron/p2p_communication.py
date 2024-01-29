@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +16,7 @@
 
 from functools import reduce
 import operator
+from megatron.global_vars import get_current_device
 import torch
 
 from megatron import get_args
@@ -47,6 +49,8 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
     # if needed.
     tensor_recv_prev = None
     tensor_recv_next = None
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+        "_communicate - Unsupported for split micro batch size"
     tensor_shape = (args.seq_length, args.micro_batch_size, args.hidden_size)
     if args.scatter_gather_tensors_in_pipeline:
         tensor_chunk_shape = reduce(operator.mul, tensor_shape, 1) // \
@@ -59,12 +63,12 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
     if recv_prev:
         tensor_recv_prev = torch.empty(tensor_chunk_shape,
                                        requires_grad=True,
-                                       device=torch.cuda.current_device(),
+                                       device=get_current_device(),
                                        dtype=dtype)
     if recv_next:
         tensor_recv_next = torch.empty(tensor_chunk_shape,
                                        requires_grad=True,
-                                       device=torch.cuda.current_device(),
+                                       device=get_current_device(),
                                        dtype=dtype)
 
     # Split tensor into smaller chunks if using scatter-gather optimization.
@@ -84,32 +88,39 @@ def _communicate(tensor_send_next, tensor_send_prev, recv_prev, recv_next,
                                         group=mpu.get_pipeline_model_parallel_group())
     else:
         ops = []
-        if tensor_send_prev is not None:
-            send_prev_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_prev,
-                mpu.get_pipeline_model_parallel_prev_rank())
-            ops.append(send_prev_op)
+        # TODO (SW-63566) The original order of send, recv has been reversed.
+
         if tensor_recv_prev is not None:
             recv_prev_op = torch.distributed.P2POp(
                 torch.distributed.irecv, tensor_recv_prev,
                 mpu.get_pipeline_model_parallel_prev_rank())
             ops.append(recv_prev_op)
-        if tensor_send_next is not None:
-            send_next_op = torch.distributed.P2POp(
-                torch.distributed.isend, tensor_send_next,
-                mpu.get_pipeline_model_parallel_next_rank())
-            ops.append(send_next_op)
+        if tensor_send_prev is not None:
+            send_prev_op = torch.distributed.P2POp(
+                torch.distributed.isend, tensor_send_prev,
+                mpu.get_pipeline_model_parallel_prev_rank())
+            ops.append(send_prev_op)
         if tensor_recv_next is not None:
             recv_next_op = torch.distributed.P2POp(
                 torch.distributed.irecv, tensor_recv_next,
                 mpu.get_pipeline_model_parallel_next_rank())
             ops.append(recv_next_op)
+        if tensor_send_next is not None:
+            send_next_op = torch.distributed.P2POp(
+                torch.distributed.isend, tensor_send_next,
+                mpu.get_pipeline_model_parallel_next_rank())
+            ops.append(send_next_op)
         if len(ops) > 0:
             reqs = torch.distributed.batch_isend_irecv(ops)
             for req in reqs:
                 req.wait()
     # To protect against race condition when using batch_isend_irecv().
-    torch.cuda.synchronize()
+    if args.device == "cuda":
+        torch.cuda.synchronize()
+    elif args.device == "hpu":
+        #TODO: SW-105043
+        import habana_frameworks.torch.core as htcore
+        htcore.hpu.synchronize()
 
     # If using scatter-gather optimization, gather smaller chunks.
     if args.scatter_gather_tensors_in_pipeline:

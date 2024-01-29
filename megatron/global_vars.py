@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +28,7 @@ from .microbatches import build_num_microbatches_calculator
 
 _GLOBAL_ARGS = None
 _GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
+_GLOBAL_NUM_EVAL_MICROBATCHES_CALCULATOR = None
 _GLOBAL_TOKENIZER = None
 _GLOBAL_TENSORBOARD_WRITER = None
 _GLOBAL_ADLR_AUTORESUME = None
@@ -51,6 +53,17 @@ def update_num_microbatches(consumed_samples, consistency_check=True):
     _GLOBAL_NUM_MICROBATCHES_CALCULATOR.update(consumed_samples,
                                                consistency_check)
 
+
+def get_num_eval_microbatches():
+    return _GLOBAL_NUM_EVAL_MICROBATCHES_CALCULATOR.get()
+
+#When using different micro batch size for training and evaluation/validation
+#we have different number of micro batches.
+def get_num_microbatches_by_mode(is_training):
+    if is_training:
+        return get_num_microbatches()
+    else:
+        return get_num_eval_microbatches()
 
 def get_tokenizer():
     """Return tokenizer."""
@@ -83,7 +96,7 @@ def set_global_variables(extra_args_provider=None, args_defaults={},
                        defaults=args_defaults,
                        ignore_unknown_args=ignore_unknown_args)
     _build_num_microbatches_calculator(args)
-    if args.vocab_file:
+    if args.vocab_file or args.tokenizer_model_file:
         _ = _build_tokenizer(args)
     _set_tensorboard_writer(args)
     _set_adlr_autoresume(args)
@@ -104,11 +117,16 @@ def _parse_args(extra_args_provider=None, defaults={},
 def _build_num_microbatches_calculator(args):
 
     global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
+    global _GLOBAL_NUM_EVAL_MICROBATCHES_CALCULATOR
     _ensure_var_is_not_initialized(_GLOBAL_NUM_MICROBATCHES_CALCULATOR,
                                    'num microbatches calculator')
+    _ensure_var_is_not_initialized(_GLOBAL_NUM_EVAL_MICROBATCHES_CALCULATOR,
+                                   'num eval microbatches calculator')
 
     _GLOBAL_NUM_MICROBATCHES_CALCULATOR = build_num_microbatches_calculator(
-        args)
+        args, args.micro_batch_size)
+    _GLOBAL_NUM_EVAL_MICROBATCHES_CALCULATOR = build_num_microbatches_calculator(
+        args, args.eval_micro_batch_size)
 
 
 def _build_tokenizer(args):
@@ -192,14 +210,23 @@ class _Timer:
     def start(self):
         """Start the timer."""
         assert not self.started_, 'timer has already been started'
-        torch.cuda.synchronize()
+        #TODO: SW-90304 check if we can remove synchonization
+        if get_args().device == "cuda":
+            torch.cuda.synchronize()
+        elif get_args().device == "hpu":
+            import habana_frameworks.torch.core as htcore
+            htcore.hpu.synchronize()
         self.start_time = time.time()
         self.started_ = True
 
     def stop(self):
         """Stop the timer."""
         assert self.started_, 'timer is not started'
-        torch.cuda.synchronize()
+        if get_args().device == "cuda":
+            torch.cuda.synchronize()
+        elif get_args().device == "hpu":
+            import habana_frameworks.torch.core as htcore
+            htcore.hpu.synchronize()
         self.elapsed_ += (time.time() - self.start_time)
         self.started_ = False
 
@@ -249,14 +276,35 @@ class Timers:
     def log(self, names, normalizer=1.0, reset=True):
         """Log a group of timers."""
         assert normalizer > 0.0
-        string = 'time (ms)'
+        string = ''
         for name in names:
             elapsed_time = self.timers[name].elapsed(
                 reset=reset) * 1000.0 / normalizer
             string += ' | {}: {:.2f}'.format(name, elapsed_time)
+        if not len(string):
+            return
+        string = 'time (ms)' + string
         if torch.distributed.is_initialized():
             if torch.distributed.get_rank() == (
                     torch.distributed.get_world_size() - 1):
                 print(string, flush=True)
         else:
             print(string, flush=True)
+
+def get_current_device():
+    if get_args().device.type=="hpu":
+        if not hasattr(get_current_device, "ht"):
+            import habana_frameworks.torch as ht
+            get_current_device.ht = ht
+        return "hpu:"+str(get_current_device.ht.hpu.current_device())
+    else:
+        return "cuda:"+str(torch.cuda.current_device())
+
+def get_current_device_index():
+    if get_args().device.type=="hpu":
+        if not hasattr(get_current_device_index, "ht"):
+            import habana_frameworks.torch as ht
+            get_current_device_index.ht = ht
+        return get_current_device_index.ht.hpu.current_device()
+    else:
+        return torch.cuda.current_device()

@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,11 +18,14 @@
 
 import sys
 
+import os
 import torch
 from torch.nn.parallel import DistributedDataParallel as torchDDP
+from megatron import get_args
 
-from apex.multi_tensor_apply import multi_tensor_applier
-import amp_C
+if (torch.cuda.is_available()):
+    from apex.multi_tensor_apply import multi_tensor_applier
+    import amp_C
 
 from megatron import get_args
 from megatron import print_rank_0
@@ -63,14 +67,23 @@ def calc_params_l2_norm(model):
                 else:
                     params_data.append(param.data)
     # Calculate norm
-    dummy_overflow_buf = torch.cuda.IntTensor([0])
-    norm, _ = multi_tensor_applier(
-        amp_C.multi_tensor_l2norm,
-        dummy_overflow_buf,
-        [params_data],
-        False # no per-parameter norm
-    )
-    norm_2 = norm * norm
+    # TODO SW-56092: not having multi_tensor_applier implementation outside CUDA
+    if args.device.type == "cuda":
+        # Calculate norm
+        dummy_overflow_buf = torch.cuda.IntTensor([0])
+        norm, _ = multi_tensor_applier(
+            amp_C.multi_tensor_l2norm,
+            dummy_overflow_buf,
+            [params_data],
+            False # no per-parameter norm
+        )
+        norm_2 = norm * norm
+    else:
+        # less optimized version for now
+        norm_2 = 0.0
+        for param_tmp in params_data:
+            norm_2 += param_tmp.square().sum()
+
     # Sum across all model-parallel GPUs.
     torch.distributed.all_reduce(norm_2,
                                  op=torch.distributed.ReduceOp.SUM,
@@ -148,7 +161,9 @@ def get_ltor_masks_and_position_ids(data,
                                     eod_token,
                                     reset_position_ids,
                                     reset_attention_mask,
-                                    eod_mask_loss):
+                                    eod_mask_loss,
+                                    dummy_sample=None,
+                                    labels=None):
     """Build masks and position id for left to right model."""
 
     # Extract batch size and sequence length.
@@ -167,6 +182,12 @@ def get_ltor_masks_and_position_ids(data,
     loss_mask = torch.ones(data.size(), dtype=torch.float, device=data.device)
     if eod_mask_loss:
         loss_mask[data == eod_token] = 0.0
+
+    if dummy_sample is not None:
+        loss_mask[dummy_sample.bool()] = 0.0
+
+    if labels is not None:
+        loss_mask[labels == -1] = 0.0
 
     # Position ids.
     position_ids = torch.arange(seq_length, dtype=torch.long,
@@ -241,3 +262,11 @@ def checkpoint_throughput_calculator(model, latency_second):
     checkpoint_GB = approx_parameters_in_billions * checkpoint_multiplier
     GB_per_second = checkpoint_GB / latency_second
     print_rank_0(f"Checkpoint Save GB: {round(checkpoint_GB, 3)}, GB/Sec: {round(GB_per_second,2)}, Latency(second): {round(latency_second, 3)}")
+
+
+def found_kill_switch():
+    args = get_args()
+    if args.kill_switch_path is not None and os.path.exists(args.kill_switch_path):
+        return True
+    else:
+        return False

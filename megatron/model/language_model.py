@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,13 +30,23 @@ from megatron.model.utils import init_method_normal, scaled_init_method_normal
 def parallel_lm_logits(input_, word_embeddings_weight, parallel_output,
                        bias=None):
     """LM logits using word embedding weights."""
+    args = get_args()
+
     # Parallel logits.
-    input_parallel = mpu.copy_to_tensor_model_parallel_region(input_)
+    input_parallel = input_ if args.sequence_parallel else mpu.copy_to_tensor_model_parallel_region(input_)
+
+    gather_input = lambda x: x
+    if args.sequence_parallel:
+        gather_input = mpu.gather_from_sequence_parallel_region
+
+    linear = mpu.layers.flatten_input(F.linear)
+
     # Matrix multiply.
     if bias is None:
-        logits_parallel = F.linear(input_parallel, word_embeddings_weight)
+        logits_parallel = linear(gather_input(input_parallel), word_embeddings_weight)
     else:
-        logits_parallel = F.linear(input_parallel, word_embeddings_weight, bias)
+        logits_parallel = linear(gather_input(input_parallel), word_embeddings_weight, bias)
+
     # Gather if needed.
     if parallel_output:
         return logits_parallel
@@ -47,7 +58,8 @@ def get_language_model(num_tokentypes, add_pooler,
                        encoder_attn_mask_type, init_method=None,
                        scaled_init_method=None, add_decoder=False,
                        decoder_attn_mask_type=AttnMaskType.causal,
-                       pre_process=True, post_process=True, num_experts=1):
+                       pre_process=True, post_process=True, num_experts=1,
+                       use_position=True):
     """Build language model and return along with the key to save."""
     args = get_args()
 
@@ -69,7 +81,8 @@ def get_language_model(num_tokentypes, add_pooler,
         add_pooler=add_pooler,
         pre_process=pre_process,
         post_process=post_process,
-        num_experts=num_experts)
+        num_experts=num_experts,
+        use_position=use_position)
     # key used for checkpoints.
     language_model_key = 'language_model'
 
@@ -90,11 +103,14 @@ class Pooler(MegatronModule):
 
     def __init__(self, hidden_size, init_method):
         super(Pooler, self).__init__()
+        args = get_args()
         self.dense = get_linear_layer(hidden_size, hidden_size, init_method)
+        self.sequence_parallel = args.sequence_parallel
 
     def forward(self, hidden_states, sequence_index=0):
         # hidden_states: [b, s, h]
         # sequence_index: index of the token to pool.
+        assert not self.sequence_parallel, 'sequence parallel is not supported with Pooler'
         pooled = hidden_states[:, sequence_index, :]
         pooled = self.dense(pooled)
         pooled = torch.tanh(pooled)
@@ -121,12 +137,14 @@ class Embedding(MegatronModule):
                  max_sequence_length,
                  embedding_dropout_prob,
                  init_method,
-                 num_tokentypes=0):
+                 num_tokentypes=0,
+                 use_position=True):
         super(Embedding, self).__init__()
 
         self.hidden_size = hidden_size
         self.init_method = init_method
         self.num_tokentypes = num_tokentypes
+        self.use_position = use_position
 
         args = get_args()
 
@@ -137,11 +155,12 @@ class Embedding(MegatronModule):
         self._word_embeddings_key = 'word_embeddings'
 
         # Position embedding (serial).
-        self.position_embeddings = torch.nn.Embedding(
-            max_sequence_length, self.hidden_size)
-        self._position_embeddings_key = 'position_embeddings'
-        # Initialize the position embeddings.
-        self.init_method(self.position_embeddings.weight)
+        if self.use_position:
+            self.position_embeddings = torch.nn.Embedding(
+                max_sequence_length, self.hidden_size)
+            self._position_embeddings_key = 'position_embeddings'
+            # Initialize the position embeddings.
+            self.init_method(self.position_embeddings.weight)
 
         # Token type embedding.
         # Add this as an optional field that can be added through
@@ -156,6 +175,7 @@ class Embedding(MegatronModule):
         else:
             self.tokentype_embeddings = None
 
+        self.sequence_parallel = args.sequence_parallel
         # Embeddings dropout
         self.embedding_dropout = torch.nn.Dropout(embedding_dropout_prob)
 
@@ -178,9 +198,10 @@ class Embedding(MegatronModule):
 
     def forward(self, input_ids, position_ids, tokentype_ids=None):
         # Embeddings.
-        words_embeddings = self.word_embeddings(input_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-        embeddings = words_embeddings + position_embeddings
+        embeddings = self.word_embeddings(input_ids)
+        if self.use_position:
+            position_embeddings = self.position_embeddings(position_ids)
+            embeddings = embeddings + position_embeddings
         if tokentype_ids is not None:
             assert self.tokentype_embeddings is not None
             embeddings = embeddings + self.tokentype_embeddings(tokentype_ids)
@@ -188,7 +209,14 @@ class Embedding(MegatronModule):
             assert self.tokentype_embeddings is None
 
         # Dropout.
-        embeddings = self.embedding_dropout(embeddings)
+        if self.sequence_parallel:
+            # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
+            embeddings = embeddings.transpose(0, 1).contiguous()
+            embeddings = mpu.scatter_to_sequence_parallel_region(embeddings)
+            with mpu.get_cuda_rng_tracker().fork():
+                embeddings = self.embedding_dropout(embeddings)
+        else:
+            embeddings = self.embedding_dropout(embeddings)
 
         return embeddings
 
@@ -199,9 +227,10 @@ class Embedding(MegatronModule):
         state_dict_ = {}
         state_dict_[self._word_embeddings_key] \
             = self.word_embeddings.state_dict(destination, prefix, keep_vars)
-        state_dict_[self._position_embeddings_key] \
-            = self.position_embeddings.state_dict(
-                destination, prefix, keep_vars)
+        if self.use_position:
+            state_dict_[self._position_embeddings_key] \
+                = self.position_embeddings.state_dict(
+                    destination, prefix, keep_vars)
         if self.num_tokentypes > 0:
             state_dict_[self._tokentype_embeddings_key] \
                 = self.tokentype_embeddings.state_dict(
@@ -225,16 +254,21 @@ class Embedding(MegatronModule):
         self.word_embeddings.load_state_dict(state_dict_, strict=strict)
 
         # Position embedding.
-        if self._position_embeddings_key in state_dict:
-            state_dict_ = state_dict[self._position_embeddings_key]
-        else:
-            # for backward compatibility.
+        if self.use_position:
             state_dict_ = {}
-            for key in state_dict.keys():
-                if 'position_embeddings' in key:
-                    state_dict_[key.split('position_embeddings.')[1]] \
-                        = state_dict[key]
-        self.position_embeddings.load_state_dict(state_dict_, strict=strict)
+            if self._position_embeddings_key in state_dict:
+                state_dict_ = state_dict[self._position_embeddings_key]
+            else:
+                # for backward compatibility.
+                for key in state_dict.keys():
+                    if 'position_embeddings' in key:
+                        state_dict_[key.split('position_embeddings.')[1]] \
+                            = state_dict[key]
+            if state_dict_:
+                self.position_embeddings.load_state_dict(state_dict_, strict=strict)
+        elif 'position_embeddings' in state_dict:
+            print('WARNING: Embedding configured without learnable positions, '
+                  'but loading from a checkpoint that contains learnable positions')
 
         # Tokentype embedding.
         if self.num_tokentypes > 0:
@@ -272,7 +306,7 @@ class EmbeddingPipe(Embedding):
             tokentype_ids = inputs[3]
         else:
             tokentype_ids = None
-        
+
         embeddings = super().forward(input_ids, position_ids, tokentype_ids=tokentype_ids)
 
         # If cmd args has attn_mask, we don't forward it as an activation.
@@ -312,7 +346,8 @@ class TransformerLanguageModel(MegatronModule):
                  add_pooler=False,
                  pre_process=True,
                  post_process=True,
-                 num_experts=1):
+                 num_experts=1,
+                 use_position=True):
         super(TransformerLanguageModel, self).__init__()
         args = get_args()
 
@@ -334,7 +369,8 @@ class TransformerLanguageModel(MegatronModule):
                                        args.max_position_embeddings,
                                        args.hidden_dropout,
                                        self.init_method,
-                                       self.num_tokentypes)
+                                       self.num_tokentypes,
+                                       use_position=use_position)
             self._embedding_key = 'embedding'
 
         # Transformer.

@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -103,6 +104,8 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
     """Traing and validation dataloaders."""
     args = get_args()
 
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+        "_build_train_valid_dataloaders (vision) - Unsupported for split micro batch size"
     print_rank_0("building train and validation dataloaders ...")
     # Training dataset.
     train_dataloader = build_data_loader(

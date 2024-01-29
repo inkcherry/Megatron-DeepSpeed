@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,6 +46,8 @@ def accuracy_func_provider():
     )
     dataset = datasets.ImageFolder(root=val_data_path, transform=transform_val)
 
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+        "accuracy_func_provider - Unsupported for split micro batch size"
     dataloader = build_data_loader(
         dataset,
         args.micro_batch_size,

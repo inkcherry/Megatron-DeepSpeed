@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +23,9 @@ import torch
 from torch.nn.parameter import Parameter
 from torch.nn import init
 import importlib
+from megatron import get_args
+from torch.nn.functional import layer_norm
+from megatron.global_vars import get_current_device
 
 global fused_mix_prec_layer_norm_cuda
 fused_mix_prec_layer_norm_cuda = None
@@ -61,30 +65,59 @@ class FusedLayerNormAffineFunction(torch.autograd.Function):
 
 class MixedFusedLayerNorm(torch.nn.Module):
 
-  def __init__(self, normalized_shape, eps=1e-5):
+  def __init__(self, normalized_shape, eps=1e-5, sequence_parallel=False):
         super(MixedFusedLayerNorm, self).__init__()
-
-        global fused_mix_prec_layer_norm_cuda
-        fused_mix_prec_layer_norm_cuda = importlib.import_module(
-          "fused_mix_prec_layer_norm_cuda")
+        args = get_args()
+        if args.use_hpu:
+          self.layer_norm_func = self._native_layer_norm_helper
+        else:
+          global fused_mix_prec_layer_norm_cuda
+          fused_mix_prec_layer_norm_cuda = importlib.import_module(
+            "fused_mix_prec_layer_norm_cuda")
+          self.layer_norm_func = FusedLayerNormAffineFunction.apply
 
         if isinstance(normalized_shape, numbers.Integral):
             normalized_shape = (normalized_shape,)
         self.normalized_shape = torch.Size(normalized_shape)
         self.eps = eps
-        self.weight = Parameter(torch.Tensor(*normalized_shape))
-        self.bias = Parameter(torch.Tensor(*normalized_shape))
+
+        self.weight = Parameter(torch.empty(
+                    *normalized_shape,
+                    device=get_current_device(),
+                    dtype=args.params_dtype))
+
+        self.bias = Parameter(torch.empty(
+                    *normalized_shape,
+                    device=get_current_device(),
+                    dtype=args.params_dtype))
+
         self.reset_parameters()
+
+        if sequence_parallel:
+            # set sequence parallelism flag on weight and bias parameters
+            setattr(self.weight, 'sequence_parallel', True)
+            setattr(self.bias, 'sequence_parallel', True)
+
+  def _native_layer_norm_helper(self, input, weight, bias, normalized_shape, eps):
+    return layer_norm(input, normalized_shape, weight, bias, eps)
 
 
   def reset_parameters(self):
+    # Init the layernorm weight to 0 if apply_layernorm_weight_plus_one is set, we will add the 1 in the forward function
+    # when calling the layernorm function
+    args = get_args()
+    if args.apply_layernorm_weight_plus_one:
+        init.zeros_(self.weight)
+    else:
+        init.ones_(self.weight)
 
-    init.ones_(self.weight)
     init.zeros_(self.bias)
 
 
   def forward(self, input):
 
-    return FusedLayerNormAffineFunction.apply(
-      input, self.weight, self.bias, self.normalized_shape,self.eps)
-
+    args = get_args()
+    if args.apply_layernorm_weight_plus_one:
+        return self.layer_norm_func(input, self.weight + 1, self.bias, self.normalized_shape, self.eps)
+    else:
+        return self.layer_norm_func(input, self.weight, self.bias, self.normalized_shape, self.eps)

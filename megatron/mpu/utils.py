@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +16,17 @@
 
 
 import torch
+from megatron import get_args
 
+USE_HPU=False
+
+def get_use_hpu():
+    global USE_HPU
+    if USE_HPU is False:
+        args = get_args()
+        if args.use_hpu:
+            USE_HPU = True
+    return USE_HPU
 
 def ensure_divisibility(numerator, denominator):
     """Ensure that numerator is divisible by the denominator."""

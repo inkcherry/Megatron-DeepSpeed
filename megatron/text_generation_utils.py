@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +41,8 @@ def get_batch(context_tokens):
     tokenizer = get_tokenizer()
 
     # Move to GPU.
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+            "get_batch - Unsupported for split micro batch size"
     tokens = context_tokens.view(args.micro_batch_size, -1).contiguous().cuda()
     # Get the attention mask and postition ids.
     attention_mask, _, position_ids = get_ltor_masks_and_position_ids(
@@ -329,6 +332,8 @@ def generate_samples_unconditional(model, latencies=[], model_latencies=[], sing
     tokenizer = get_tokenizer()
 
     num_samples = args.num_samples
+    assert args.micro_batch_size == args.eval_micro_batch_size, \
+        "generate_samples_unconditional - Unsupported for split micro batch size"
     context_tokens = [[tokenizer.eod]
                       for _ in range(args.micro_batch_size)]
     ctr = 0

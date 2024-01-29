@@ -17,8 +17,49 @@
 """Model and data parallel groups."""
 
 import torch
+from functools import reduce
+import operator
 
+from megatron import get_args
+from megatron.global_vars import get_current_device
 from .utils import ensure_divisibility
+
+
+# Memory buffers to avoid dynamic memory allocation
+_GLOBAL_MEMORY_BUFFER = None
+
+
+class GlobalMemoryBuffer:
+    """Global buffer to avoid dynamic memory allocations.
+    Caller should ensure that buffers of the same name
+    are not used concurrently."""
+
+    def __init__(self):
+        self.buffer = {}
+
+    def get_tensor(self, tensor_shape, dtype, name):
+        required_len = reduce(operator.mul, tensor_shape, 1)
+        if self.buffer.get((name, dtype), None) is None or \
+                self.buffer[(name, dtype)].numel() < required_len:
+            self.buffer[(name, dtype)] = \
+                torch.empty(required_len,
+                            dtype=dtype,
+                            device=get_current_device(),
+                            requires_grad=False)
+        return self.buffer[(name, dtype)][0:required_len].view(*tensor_shape)
+
+
+def get_global_memory_buffer():
+    """Return the global GlobalMemoryBuffer object"""
+    assert _GLOBAL_MEMORY_BUFFER is not None, 'global memory buffer is not initialized'
+    return _GLOBAL_MEMORY_BUFFER
+
+
+def _set_global_memory_buffer():
+    """Initialize global buffer"""
+    global _GLOBAL_MEMORY_BUFFER
+    assert _GLOBAL_MEMORY_BUFFER is None, 'global memory buffer is already initialized'
+    _GLOBAL_MEMORY_BUFFER = GlobalMemoryBuffer()
 
 
 # Intra-layer model parallel group that the current rank belongs to.

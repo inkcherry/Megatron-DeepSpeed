@@ -1,4 +1,5 @@
 # coding=utf-8
+# Copyright (c) 2023 Habana Labs, Ltd. an Intel Company.
 # Copyright (c) 2020, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,13 +18,15 @@
 
 from abc import ABC
 from abc import abstractmethod
+from megatron.global_vars import get_current_device
 
 import torch
 
-from apex.multi_tensor_apply import multi_tensor_applier
-import amp_C
+if (torch.cuda.is_available()):
+    from apex.multi_tensor_apply import multi_tensor_applier
+    import amp_C
 
-from megatron import get_timers
+from megatron import get_timers, get_args
 from megatron import mpu
 from megatron import print_rank_0
 
@@ -50,7 +53,8 @@ def _multi_tensor_copy_this_to_that(this, that, overflow_buf=None):
     We don't have a blfoat16 implementation so for now if the overflow_buf
     is not provided, we default back to simple loop copy to be compatible
     with bfloat16."""
-    if overflow_buf:
+    # TODO SW-56092: not having multi_tensor_applier implementation outside CUDA
+    if get_args().device.type == "cuda" and overflow_buf:
         overflow_buf.fill_(0)
         # Scaling with factor `1.0` is equivalent to copy.
         multi_tensor_applier(amp_C.multi_tensor_scale,
@@ -470,7 +474,7 @@ class FP32Optimizer(MegatronOptimizer):
             optimizer, clip_grad, log_num_zeros_in_grad,
             params_have_main_grad)
 
-        self._scale = torch.cuda.FloatTensor([1.0])
+        self._scale = torch.FloatTensor([1.0]).to(get_current_device())
 
 
     def zero_grad(self, set_to_none=True):
