@@ -54,6 +54,7 @@ except ImportError:
     warnings.warn('Apex is not installed. Falling back to Torch Norm')
     LNImpl = WrappedTorchNorm
 
+from megatron.core.transformer.rmsnorm import RMSNorm
 
 def get_gpt_layer_with_transformer_engine_spec(
     num_experts: Optional[int] = None,
@@ -160,6 +161,7 @@ def get_gpt_layer_local_spec(
     multi_latent_attention: Optional[bool] = False,
     fp8: Optional[str] = None,  # pylint: disable=unused-arguments
     moe_use_legacy_grouped_gemm: Optional[bool] = False,
+    normalization_type: str = 'LayerNorm',
 ) -> ModuleSpec:
     """Use this spec for an implementation using only modules in Megatron-Core.
 
@@ -188,11 +190,19 @@ def get_gpt_layer_local_spec(
         moe_use_legacy_grouped_gemm=moe_use_legacy_grouped_gemm,
     )
 
+    if normalization_type not in ('LayerNorm', 'RMSNorm'):
+        raise Exception(f'Only LayerNorm and RMSNorm are currently supported, configured {normalization_type}')
+    normalization_class = None
+    if normalization_type == "LayerNorm":
+        normalization_class = LNImpl
+    elif normalization_type == "RMSNorm":
+        normalization_class = RMSNorm
+
     if multi_latent_attention:
         return ModuleSpec(
             module=TransformerLayer,
             submodules=TransformerLayerSubmodules(
-                input_layernorm=LNImpl,
+                input_layernorm=normalization_class,
                 self_attention=ModuleSpec(
                     module=MLASelfAttention,
                     params={"attn_mask_type": AttnMaskType.causal},
@@ -204,12 +214,12 @@ def get_gpt_layer_local_spec(
                         linear_kv_up_proj=ColumnParallelLinear,
                         core_attention=DotProductAttention,
                         linear_proj=RowParallelLinear,
-                        q_layernorm=LNImpl if qk_layernorm else IdentityOp,
-                        kv_layernorm=LNImpl if qk_layernorm else IdentityOp,
+                        q_layernorm=normalization_class if qk_layernorm else IdentityOp,
+                        kv_layernorm=normalization_class if qk_layernorm else IdentityOp,
                     ),
                 ),
                 self_attn_bda=get_bias_dropout_add,
-                pre_mlp_layernorm=LNImpl,
+                pre_mlp_layernorm=normalization_class,
                 mlp=mlp,
                 mlp_bda=get_bias_dropout_add,
             ),
@@ -218,7 +228,7 @@ def get_gpt_layer_local_spec(
         return ModuleSpec(
             module=TransformerLayer,
             submodules=TransformerLayerSubmodules(
-                input_layernorm=LNImpl,
+                input_layernorm=normalization_class,
                 self_attention=ModuleSpec(
                     module=SelfAttention,
                     params={"attn_mask_type": AttnMaskType.causal},
@@ -226,12 +236,12 @@ def get_gpt_layer_local_spec(
                         linear_qkv=ColumnParallelLinear,
                         core_attention=DotProductAttention,
                         linear_proj=RowParallelLinear,
-                        q_layernorm=LNImpl if qk_layernorm else IdentityOp,
-                        k_layernorm=LNImpl if qk_layernorm else IdentityOp,
+                        q_layernorm=normalization_class if qk_layernorm else IdentityOp,
+                        k_layernorm=normalization_class if qk_layernorm else IdentityOp,
                     ),
                 ),
                 self_attn_bda=get_bias_dropout_add,
-                pre_mlp_layernorm=LNImpl,
+                pre_mlp_layernorm=normalization_class,
                 mlp=mlp,
                 mlp_bda=get_bias_dropout_add,
                 sharded_state_dict_keys_map={
@@ -303,7 +313,15 @@ def get_gpt_decoder_block_spec(
     if use_transformer_engine:
         layer_norm_impl = TENorm
     else:
-        layer_norm_impl = LNImpl
+        normalization_type = config.normalization
+        if normalization_type not in ('LayerNorm', 'RMSNorm'):
+            raise Exception(f'Only LayerNorm and RMSNorm are currently supported, configured {normalization_type}')
+        layer_norm_impl = None
+        if normalization_type == "LayerNorm":
+            layer_norm_impl = LNImpl
+        elif normalization_type == "RMSNorm":
+            layer_norm_impl = RMSNorm
+
 
     # Layer specs.
     dense_layer_spec = (
@@ -321,6 +339,7 @@ def get_gpt_decoder_block_spec(
             qk_layernorm=config.qk_layernorm,
             multi_latent_attention=config.multi_latent_attention,
             moe_use_legacy_grouped_gemm=config.moe_use_legacy_grouped_gemm,
+            normalization_type=config.normalization,
         )
     )
     moe_layer_spec = (
@@ -338,6 +357,7 @@ def get_gpt_decoder_block_spec(
             qk_layernorm=config.qk_layernorm,
             multi_latent_attention=config.multi_latent_attention,
             moe_use_legacy_grouped_gemm=config.moe_use_legacy_grouped_gemm,
+            normalization_type=config.normalization,
         )
     )
 

@@ -42,6 +42,8 @@ class DotProductAttention(MegatronModule):
         attention_dropout: float = None,
         softmax_scale: float = None,
         cp_comm_type: str = None,
+        k_channels: int = None,
+        v_channels: int = None,
     ):
         super().__init__(config=config)
 
@@ -59,12 +61,16 @@ class DotProductAttention(MegatronModule):
         self.attn_mask_type = attn_mask_type
         self.attention_type = attention_type  # unused for now
 
-        projection_size = self.config.kv_channels * self.config.num_attention_heads
+        #projection_size = self.config.kv_channels * self.config.num_attention_heads
+        projection_size = (config.v_head_dim if config.multi_latent_attention else config.kv_channels) \
+            * config.num_attention_heads
 
         # Per attention head and per partition values.
         world_size = parallel_state.get_tensor_model_parallel_world_size()
         self.hidden_size_per_partition = divide(projection_size, world_size)
-        self.hidden_size_per_attention_head = divide(projection_size, config.num_attention_heads)
+        #self.hidden_size_per_attention_head = divide(projection_size, config.num_attention_heads)
+        self.hidden_size_per_attention_head = (config.qk_head_dim + config.qk_pos_emb_head_dim) \
+                if config.multi_latent_attention else divide(projection_size, config.num_attention_heads)
         self.num_attention_heads_per_partition = divide(self.config.num_attention_heads, world_size)
         self.num_query_groups_per_partition = divide(self.config.num_query_groups, world_size)
 

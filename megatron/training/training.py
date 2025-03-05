@@ -119,6 +119,89 @@ def print_datetime(string):
     time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print_rank_0(f'[{string}] datetime: {time_str} ')
 
+def num_floating_point_operations_deepseek_v3(args, batch_size):
+        # attention
+        q_a_proj = batch_size * args.seq_length \
+                        * args.hidden_size \
+                        * args.q_lora_rank \
+                        * 2 * args.num_layers
+        q_b_proj = batch_size * args.seq_length \
+                        * args.q_lora_rank \
+                        * (args.num_attention_heads \
+                           * (args.qk_head_dim + args.qk_pos_emb_head_dim)) \
+                        * 2 * args.num_layers
+        kv_a_proj_with_mqa = batch_size * args.seq_length \
+                        * args.hidden_size \
+                        * (args.kv_lora_rank + args.qk_pos_emb_head_dim) \
+                        * 2 * args.num_layers
+        kv_b_proj = batch_size * args.seq_length \
+                        * args.kv_lora_rank \
+                        * (args.num_attention_heads \
+                           * (args.qk_head_dim + args.v_head_dim)) \
+                        * 2 * args.num_layers
+        qkv_proj = q_a_proj + q_b_proj + kv_a_proj_with_mqa + kv_b_proj
+
+        qk_matmul = batch_size * args.seq_length \
+                            * args.seq_length \
+                            * (args.num_attention_heads * \
+                                (args.qk_head_dim + args.qk_pos_emb_head_dim)) \
+                            * 2 * args.num_layers
+        score_v_matmul = batch_size * args.seq_length \
+                            * args.seq_length \
+                            * (args.num_attention_heads * args.v_head_dim) \
+                            * 2 * args.num_layers
+
+        o_proj = batch_size * args.seq_length \
+                        * (args.num_attention_heads * args.v_head_dim) \
+                        * args.hidden_size \
+                        * 2 * args.num_layers
+
+        attention_total = qkv_proj + qk_matmul + score_v_matmul + o_proj
+
+        # mlp
+        mlp_gate = batch_size * args.seq_length \
+                        * args.hidden_size \
+                        * args.ffn_hidden_size \
+                        * 2 * 3
+        mlp_up = mlp_gate
+        mlp_down = mlp_gate
+        mlp_total = mlp_gate + mlp_up + mlp_down
+
+        # experts
+        moe_gate = batch_size * args.seq_length \
+                    * args.hidden_size \
+                    * args.num_experts \
+                    * 2 * (args.num_layers - 3)
+
+        expert_gate = batch_size * args.seq_length \
+                        * args.moe_router_topk \
+                        * args.hidden_size \
+                        * args.moe_ffn_hidden_size \
+                        * 2 * (args.num_layers - 3)
+        expert_up = expert_gate
+        expert_down = expert_gate
+        expert_total = expert_gate + expert_up + expert_down
+
+        # shared expert
+        shared_expert_gate = batch_size * args.seq_length \
+                        * args.hidden_size \
+                        * args.moe_shared_expert_intermediate_size \
+                        * 2 * (args.num_layers - 3)
+        shared_expert_up = shared_expert_gate
+        shared_expert_down = shared_expert_gate
+        shared_expert_total = shared_expert_gate + shared_expert_up + shared_expert_down
+
+        moe_total = moe_gate + expert_total
+
+        lm_head = batch_size * args.seq_length \
+                        * args.hidden_size \
+                        * args.padded_vocab_size \
+                        * 2
+
+        total_flops = attention_total + mlp_total + \
+                moe_total + shared_expert_total + lm_head
+
+        return total_flops * 3
 
 def num_floating_point_operations(args, batch_size):
     # Attention projection size.
@@ -1102,7 +1185,7 @@ def training_log(loss_dict, total_loss_dict, learning_rate, decoupled_learning_r
         elapsed_time = timers('interval-time').elapsed(barrier=True)
         elapsed_time_per_iteration = elapsed_time / total_iterations
 
-        throughput = num_floating_point_operations(args, batch_size) / (
+        throughput = num_floating_point_operations_deepseek_v3(args, batch_size) / (
             elapsed_time_per_iteration * 10**12 * args.world_size)
 
         one_logger_utils.track_e2e_metrics(args.log_throughput, throughput)
@@ -1611,7 +1694,7 @@ def train(forward_step_func, model, optimizer, opt_param_scheduler,
         else:
             assert num_skipped_samples_in_batch == 0
         args.skipped_train_samples += num_skipped_samples_in_batch
-        num_floating_point_operations_in_batch = num_floating_point_operations(args, batch_size)
+        num_floating_point_operations_in_batch = num_floating_point_operations_deepseek_v3(args, batch_size)
         num_floating_point_operations_so_far += num_floating_point_operations_in_batch
         num_floating_point_operations_since_last_log_event += num_floating_point_operations_in_batch
 

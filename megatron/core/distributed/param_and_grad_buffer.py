@@ -703,7 +703,7 @@ class _ParamAndGradBuffer:
             )
             for param in bucket.params:
                 log_strs.append(f'\t{param_to_name[param]}')
-        log_on_each_pipeline_stage(logger, logging.INFO, '\n'.join(log_strs))
+        log_on_each_pipeline_stage(logger, logging.ERROR, '\n'.join(log_strs))
 
     def scale_gradients(self, scaling_factor: float) -> None:
         """Scale the gradient data by `scaling_factor`."""
