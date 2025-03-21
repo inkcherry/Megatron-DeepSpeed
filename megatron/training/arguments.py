@@ -2020,6 +2020,7 @@ def _add_tokenizer_args(parser):
                                 'Llama2Tokenizer',
                                 'TikTokenizer',
                                 'MultimodalTokenizer',
+                                'DeepSeekV2Tokenizer',
                                 'NullTokenizer'],
                        help='What type of tokenizer to use.')
     group.add_argument('--tokenizer-model', type=str, default=None,
@@ -2028,6 +2029,8 @@ def _add_tokenizer_args(parser):
                        help='Which tiktoken pattern to use. Options: [v1, v2]')
     group.add_argument('--tiktoken-num-special-tokens', type=int, default=1000,
                        help='Number of special tokens in tiktoken tokenizer')
+    group.add_argument("--extra-vocab-size", type=int, default=0,
+                       help="The difference between the model embedding layer size and the tokenizer vocab size")
     group.add_argument('--tiktoken-special-tokens', type=str, nargs='+', default=None,
                        help='List of tiktoken special tokens, needs to have ["<unk>", "<s>", "</s>"]')
     return parser

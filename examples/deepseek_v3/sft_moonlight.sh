@@ -9,12 +9,12 @@ MEGATRON_LM_ROOT=$(realpath "$(dirname "$0")"/../../)
 export HL_LAUNCHER_TYPE="torchrun"
 #export HL_LAUNCHER_TYPE="mpirun"
 export HL_HOSTSFILE="${MEGATRON_LM_ROOT}/examples/hostsfile"
-export HL_DATA_DIR_ROOT="${SCRIPT_DIR}/dataset/enwiki-100k"
-export HL_DATA_FILE_PREFIX="enwiki-100k_text_document"
+export HL_DATA_DIR_ROOT="${SCRIPT_DIR}/dataset"
+export HL_DATA_FILE_PREFIX="alpaca_zh-qwen-train.json"
 export HL_TOKENIZER_MODEL="${SCRIPT_DIR}/DeepSeek-V3"
 
-## 4K w/ 1 nodes, drop
-export HL_SEQ_LEN=$((32*1024))
+## 1 node, Drop
+export HL_SEQ_LEN=$((1*1024))
 export HL_NUM_NODES=1
 export HL_TP=1
 export HL_PP=1
@@ -30,37 +30,15 @@ export HL_CKP_ACT=1
 export HL_USE_FUSED_SDPA=1
 export HL_USE_FUSED_SDPA_WITH_RECOMPUTE=1
 export HL_MOE_LAYER_RECOMPUTE=0
-export HL_NUM_LAYERS=4 #61
+export HL_NUM_LAYERS=27
 export HL_TOKEN_DROP=1
 export HL_TOKEN_DISPATCHER_TYPE=alltoall
-export HL_MOE_SKIP_FIRST_LAYERS=0
-
-### 4K w/ 4 nodes, drop
-## example: HL_TORCHRUN_NODE_RANK=0 HL_TORCHRUN_MASTER_ADDR=192.168.1.103 ./pretrain_deepseek_v3.sh
-#export HL_SEQ_LEN=$((4*1024)) # $((4*1024)) $((16*1024)) $((32*1024)) $((64*1024)) $((128*1024))
-#export HL_NUM_NODES=4
-#export HL_TP=1
-#export HL_PP=1
-#export HL_FISRT_PP_STAGE_LAYERS=0
-#export HL_LAST_PP_STAGE_LAYERS=0
-#export HL_DP=32
-#export HL_EP=32
-#export HL_SEQ_PARALLEL=0
-#export HL_MICRO_BATCH=1
-#export HL_GBS=128
-#export HL_USE_DISTRIBUTED_OPTIMIZER=1
-#export HL_CKP_ACT=1
-#export HL_USE_FUSED_SDPA=1
-#export HL_USE_FUSED_SDPA_WITH_RECOMPUTE=1
-#export HL_MOE_LAYER_RECOMPUTE=0
-#export HL_NUM_LAYERS=13 # 4K:13 16K:12 32K:11 64K:9 128K:6 #61
-#export HL_TOKEN_DROP=1
-#export HL_TOKEN_DISPATCHER_TYPE=alltoall
-#export HL_MOE_SKIP_FIRST_LAYERS=3
+export HL_MOE_MEMORY_OPTIMIZATION=2
+export HL_MOE_SKIP_FIRST_LAYERS=1
 
 ## common
-export HL_TRANSFORMER_IMPL="transformer_engine"
-export HL_USE_MOE_GROUPED_GEMM=1
+#export HL_TRANSFORMER_IMPL="transformer_engine"
+#export HL_USE_MOE_GROUPED_GEMM=1
 export HL_ENABLE_PARAM_GATHER_OVERLAP=0
 export HL_ENABLE_GRAD_REDUCE_OVERLAP=0
 export HL_ENABLE_SHARED_EXPERT_OVERLAP=0
@@ -70,15 +48,12 @@ export HL_SAVE=0
 export HL_USE_DIST_CKPT=1
 export HL_DIST_CKPT_FORMAT="zarr"
 export HL_FP8=0
-
-# avoid dataloader oom for long seq_len
-if [[ ${HL_SEQ_LEN} -gt $((32*1024)) ]]; then
-    export HL_NUM_WORKERS=0
-fi
+export HL_NUM_WORKERS=0
 
 export HL_LOG_INTERVAL=1
 export HL_REDIRECT_LOGS=1
-export HL_EXIT_INTERVAL=10
+export HL_EXIT_INTERVAL=1500
+export HL_LOAD_DIR="/ssd/libo/deepseek/MG_models/moonlight-16B-A3B-hf-to-mcore-tp1-pp1/"
 
 # debug
 #export HL_PROFILE=1
@@ -100,7 +75,7 @@ LAUNCHER_TYPE=${HL_LAUNCHER_TYPE:-mpirun}
 DATA_DIR=${HL_DATA_DIR_ROOT:-/data/datasets/red_pajama}
 DATA_CACHE_DIR=${HL_DATA_CACHE_DIR:-}
 DATA_FILE_PREFIX=${HL_DATA_FILE_PREFIX:-redpajama}
-TOKENIZER_TYPE=${HL_TOKENIZER_TYPE:-HuggingFaceTokenizer}
+TOKENIZER_TYPE=${HL_TOKENIZER_TYPE:-DeepSeekV2Tokenizer}
 TOKENIZER_MODEL=${HL_TOKENIZER_MODEL:-}
 TRANSFORMER_IMPL=${HL_TRANSFORMER_IMPL:-local}
 # Parallelism variables
@@ -183,23 +158,23 @@ fi
 
 # Model size variables
 MAX_SEQ_LEN=${SEQ_LEN}
+EXTRA_VOCAB_SIZE=0
 
-HIDDEN_SIZE=7168
-FFN_HIDDEN_SIZE=18432
-EXPERT_FFN_HIDDEN_SIZE=2048
-SHARED_EXPERT_FFN_HIDDEN_SIZE=2048
-NUM_HEADS=128
-NUM_KV_HEADS=128
-Q_LORA_RANK=1536
+HIDDEN_SIZE=2048
+FFN_HIDDEN_SIZE=11264
+EXPERT_FFN_HIDDEN_SIZE=1408
+SHARED_EXPERT_FFN_HIDDEN_SIZE=2816 # EXPERT_FFN_HIDDEN_SIZE * NUM_SHARED_EXPERTS
+NUM_HEADS=16
+NUM_KV_HEADS=16
+Q_LORA_RANK=0
 KV_LORA_RANK=512
 QK_HEAD_DIM=128
 QK_POS_EMB_HEAD_DIM=64
 V_HEAD_DIM=128
-#NUM_EXPERTS=256
 NUM_EXPERTS=64
-NUM_SHARED_EXPERTS=1
-TOPK=8
-NUM_LAYERS=${HL_NUM_LAYERS:-61}
+NUM_SHARED_EXPERTS=2
+TOPK=6
+NUM_LAYERS=${HL_NUM_LAYERS:-27}
 
 LR=2.2e-4
 MIN_LR=2.2e-5
@@ -209,7 +184,7 @@ ADAM_BETA2=0.95
 ADAM_EPS=1e-8
 LR_WARMUP_ITERS=2000
 ROTARY_BASE=10000
-RMSNORM_EPS=1e-6
+RMSNORM_EPS=1e-5
 INIT_STD=6e-3
 
 AUX_LOSS_COEFF=1e-4
@@ -220,7 +195,7 @@ if [[ ${FISRT_PP_STAGE_LAYERS} -eq 0 && ${LAST_PP_STAGE_LAYERS} -eq 0 && $(( NUM
 fi
 
 # Paths
-SRC_PATH="${MEGATRON_LM_ROOT}/pretrain_gpt.py"
+SRC_PATH="${MEGATRON_LM_ROOT}/train_sft.py"
 DATA_PATH=${DATA_DIR}/${DATA_FILE_PREFIX}
 
 if [[ -z "${TOKENIZER_MODEL}" ]]; then
@@ -240,7 +215,7 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
     if [[ "${FP8}" -eq 1 ]]; then
         data_type="fp8"
     fi
-    OUTPUT_DIR=${OUTPUT_DIR_PREFIX}/out/deepseek_v3/${data_type}_${TRANSFORMER_IMPL}_${EXP_NAME}_nl${NUM_LAYERS}_gb${GLOBAL_BATCH_SIZE}_mb${MICRO_BATCH_SIZE}_sp${SEQ_PARALLEL}_D${DP}_T${TP}_P${PP}_E${EP}_devices${NUM_DEVICES}_${RUNTIME}
+    OUTPUT_DIR=${OUTPUT_DIR_PREFIX}/out/moonlight_16b_a3b/${data_type}_${TRANSFORMER_IMPL}_${EXP_NAME}_nl${NUM_LAYERS}_gb${GLOBAL_BATCH_SIZE}_mb${MICRO_BATCH_SIZE}_sp${SEQ_PARALLEL}_D${DP}_T${TP}_P${PP}_E${EP}_devices${NUM_DEVICES}_${RUNTIME}
 fi
 if [[ -z "${CHECKPOINTS_DIR}" ]]; then
     CHECKPOINTS_DIR=${OUTPUT_DIR}/checkpoints
@@ -308,8 +283,8 @@ MOE_ARGS="--num-experts ${NUM_EXPERTS} \
     --moe-router-bias-update-rate 0.001 \
     --moe-router-score-function sigmoid \
     --moe-router-topk-scaling-factor 2.5 \
-    --moe-router-num-groups 8 \
-    --moe-router-group-topk 4 \
+    --moe-router-num-groups 1 \
+    --moe-router-group-topk 1 \
     --moe-router-enable-expert-bias \
     --moe-aux-loss-coeff ${AUX_LOSS_COEFF} \
     --moe-token-dispatcher-type ${TOKEN_DISPATCHER_TYPE} \
@@ -355,12 +330,16 @@ if [[ ${LAST_PP_STAGE_LAYERS} -gt 0 ]]; then
 fi
 
 MLA_ARGS="--multi-latent-attention \
-    --q-lora-rank ${Q_LORA_RANK} \
     --kv-lora-rank ${KV_LORA_RANK} \
     --qk-head-dim ${QK_HEAD_DIM} \
     --qk-layernorm \
     --qk-pos-emb-head-dim ${QK_POS_EMB_HEAD_DIM} \
     --v-head-dim ${V_HEAD_DIM}"
+
+if [[ ${Q_LORA_RANK} -gt 0 ]]; then
+    MLA_ARGS="${MLA_ARGS} \
+        --q-lora-rank ${Q_LORA_RANK}"
+fi
 
 CMD="${CMD} \
     python ${SRC_PATH} \
@@ -419,10 +398,8 @@ CMD="${CMD} \
     --init-method-std ${INIT_STD} \
     --no-check-for-nan-in-loss-and-grad \
     --num-workers ${NUM_WORKERS} \
-    --use-cpu-initialization \
-    --seed 1111 \
+    --finetune \
     "
-
 # --log-memory-to-tensorboard
 
 if [[ ${ENABLE_PARAM_GATHER_OVERLAP} -eq 1 ]]; then
@@ -470,14 +447,21 @@ if [[ "${CHECKPOINT_SAVE}" -eq 1 ]]; then
     CMD="${CMD} --save ${CHECKPOINTS_DIR}"
     CMD="${CMD} --save-interval ${SAVE_INTERVAL}"
     CMD="${CMD} --dist-ckpt-format ${DIST_CKPT_FORMAT}"
-    if [[ "${USE_DIST_CKPT}" -eq 1 ]]; then
-        CMD="${CMD} --use-dist-ckpt"
-    fi
 fi
 
-if [[ "${TOKENIZER_TYPE}" = "HuggingFaceTokenizer" || "${TOKENIZER_TYPE}" = "GPTSentencePieceTokenizer" || "${TOKENIZER_TYPE}" = "Llama2Tokenizer" || "${TOKENIZER_TYPE}" = "Llama3Tokenizer" ]]; then
+if [[ "${USE_DIST_CKPT}" -eq 1 ]]; then
+    CMD="${CMD} --use-dist-ckpt"
+fi
+
+if [[ "${TOKENIZER_TYPE}" = "HuggingFaceTokenizer" || "${TOKENIZER_TYPE}" = "GPTSentencePieceTokenizer" || "${TOKENIZER_TYPE}" = "Llama2Tokenizer" || "${TOKENIZER_TYPE}" = "Llama3Tokenizer" || "${TOKENIZER_TYPE}" = "TikTokenizer" ]]; then
     CMD="${CMD} --tokenizer-type ${TOKENIZER_TYPE}"
     CMD="${CMD} --tokenizer-model ${TOKENIZER_MODEL}"
+elif [[ "${TOKENIZER_TYPE}" = "DeepSeekV2Tokenizer" ]]; then
+    CMD="${CMD} --tokenizer-type ${TOKENIZER_TYPE}"
+    CMD="${CMD} --tokenizer-model ${TOKENIZER_MODEL}"
+    if [[ "${EXTRA_VOCAB_SIZE}" -gt 0 ]]; then
+        CMD="${CMD} --extra-vocab-size ${EXTRA_VOCAB_SIZE}"
+    fi
 elif [[ "${TOKENIZER_TYPE}" = "GPT2BPETokenizer" ]]; then
     CMD="${CMD} --tokenizer-type GPT2BPETokenizer"
     CMD="${CMD} --vocab-file ${DATA_DIR}/gpt2-vocab.json"
