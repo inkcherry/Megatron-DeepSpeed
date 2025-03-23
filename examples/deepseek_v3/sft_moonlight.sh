@@ -12,8 +12,9 @@ export HL_HOSTSFILE="${MEGATRON_LM_ROOT}/examples/hostsfile"
 export HL_DATA_DIR_ROOT="${SCRIPT_DIR}/dataset"
 export HL_DATA_FILE_PREFIX="alpaca_zh-qwen-train.json"
 export HL_TOKENIZER_MODEL="${SCRIPT_DIR}/DeepSeek-V3"
+export HL_TOKENIZER_TYPE=DeepSeekV2Tokenizer
 
-## 1 node, Drop
+## 1 node, drop
 export HL_SEQ_LEN=$((1*1024))
 export HL_NUM_NODES=1
 export HL_TP=1
@@ -24,7 +25,7 @@ export HL_DP=8
 export HL_EP=8
 export HL_SEQ_PARALLEL=0
 export HL_MICRO_BATCH=1
-export HL_GBS=32
+export HL_GBS=64
 export HL_USE_DISTRIBUTED_OPTIMIZER=1
 export HL_CKP_ACT=1
 export HL_USE_FUSED_SDPA=1
@@ -39,6 +40,8 @@ export HL_MOE_SKIP_FIRST_LAYERS=1
 ## common
 #export HL_TRANSFORMER_IMPL="transformer_engine"
 #export HL_USE_MOE_GROUPED_GEMM=1
+export HL_TRAIN_ITERS=1562
+export HL_LR_DECAY_ITER=1562
 export HL_ENABLE_PARAM_GATHER_OVERLAP=0
 export HL_ENABLE_GRAD_REDUCE_OVERLAP=0
 export HL_ENABLE_SHARED_EXPERT_OVERLAP=0
@@ -77,7 +80,7 @@ LAUNCHER_TYPE=${HL_LAUNCHER_TYPE:-mpirun}
 DATA_DIR=${HL_DATA_DIR_ROOT:-/data/datasets/red_pajama}
 DATA_CACHE_DIR=${HL_DATA_CACHE_DIR:-}
 DATA_FILE_PREFIX=${HL_DATA_FILE_PREFIX:-redpajama}
-TOKENIZER_TYPE=${HL_TOKENIZER_TYPE:-DeepSeekV2Tokenizer}
+TOKENIZER_TYPE=${HL_TOKENIZER_TYPE:-HuggingFaceTokenizer}
 TOKENIZER_MODEL=${HL_TOKENIZER_MODEL:-}
 TRANSFORMER_IMPL=${HL_TRANSFORMER_IMPL:-local}
 # Parallelism variables
@@ -160,7 +163,7 @@ fi
 
 # Model size variables
 MAX_SEQ_LEN=${SEQ_LEN}
-EXTRA_VOCAB_SIZE=0
+EXTRA_VOCAB_SIZE=467
 
 HIDDEN_SIZE=2048
 FFN_HIDDEN_SIZE=11264
@@ -178,14 +181,14 @@ NUM_SHARED_EXPERTS=2
 TOPK=6
 NUM_LAYERS=${HL_NUM_LAYERS:-27}
 
-LR=2.2e-4
-MIN_LR=2.2e-5
+LR=5e-5
+MIN_LR=4.75e-5
 MIN_LR_1=7.3e-6
 ADAM_BETA1=0.9
 ADAM_BETA2=0.95
 ADAM_EPS=1e-8
-LR_WARMUP_ITERS=2000
-ROTARY_BASE=10000
+LR_WARMUP_ITERS=0
+ROTARY_BASE=50000
 RMSNORM_EPS=1e-5
 INIT_STD=6e-3
 
@@ -282,16 +285,17 @@ MOE_ARGS="--num-experts ${NUM_EXPERTS} \
     --moe-router-topk ${TOPK} \
     --expert-model-parallel-size ${EP} \
     --moe-router-load-balancing-type seq_aux_loss \
-    --moe-router-bias-update-rate 0.001 \
+    --moe-router-bias-update-rate 0.0 \
     --moe-router-score-function sigmoid \
     --moe-router-topk-scaling-factor 2.5 \
-    --moe-router-num-groups 1 \
-    --moe-router-group-topk 1 \
     --moe-router-enable-expert-bias \
     --moe-aux-loss-coeff ${AUX_LOSS_COEFF} \
     --moe-token-dispatcher-type ${TOKEN_DISPATCHER_TYPE} \
     --moe-ffn-hidden-size ${EXPERT_FFN_HIDDEN_SIZE} \
     --moe-shared-expert-intermediate-size ${SHARED_EXPERT_FFN_HIDDEN_SIZE}"
+    #--moe-router-bias-update-rate 0.001 \
+    #--moe-router-num-groups 1 \
+    #--moe-router-group-topk 1 \
 
 if [[ "${TOKEN_DISPATCHER_TYPE}" = "alltoall" && ${ENABLE_SHARED_EXPERT_OVERLAP} -eq 1 ]]; then
     MOE_ARGS="${MOE_ARGS} \
@@ -374,7 +378,7 @@ CMD="${CMD} \
     --adam-beta2 ${ADAM_BETA2} \
     --adam-eps ${ADAM_EPS} \
     --lr ${LR} \
-    --lr-decay-style cosine \
+    --lr-decay-style linear \
     --lr-warmup-iters ${LR_WARMUP_ITERS} \
     --min-lr ${MIN_LR} \
     --micro-batch-size ${MICRO_BATCH_SIZE} \
