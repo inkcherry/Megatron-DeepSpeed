@@ -43,6 +43,8 @@ export HL_ENABLE_PARAM_GATHER_OVERLAP=0
 export HL_ENABLE_GRAD_REDUCE_OVERLAP=0
 export HL_ENABLE_SHARED_EXPERT_OVERLAP=0
 export HL_DETERMINISTIC_MODE=0
+#export NCCL_ALGO="Ring"
+#export CUBLAS_WORKSPACE_CONFIG=:4096:8
 export HL_SAVE=0
 #export HL_SAVE_INTERVAL=200
 export HL_USE_DIST_CKPT=1
@@ -399,6 +401,7 @@ CMD="${CMD} \
     --no-check-for-nan-in-loss-and-grad \
     --num-workers ${NUM_WORKERS} \
     --finetune \
+    --seed 1111 \
     "
 # --log-memory-to-tensorboard
 
