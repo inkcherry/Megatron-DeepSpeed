@@ -401,6 +401,7 @@ CMD="${CMD} \
     --eval-interval ${EVAL_INTERVAL} \
     --eval-iters ${EVAL_ITERS} \
     --data-path ${DATA_PATH} \
+    --dataloader-type cyclic \
     --init-method-std ${INIT_STD} \
     --no-check-for-nan-in-loss-and-grad \
     --num-workers ${NUM_WORKERS} \
