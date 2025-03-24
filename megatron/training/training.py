@@ -2088,9 +2088,16 @@ def build_train_valid_test_data_iterators(
     dl_type = args.dataloader_type
     assert dl_type in ['single', 'cyclic', 'external']
 
+    # Check from env if we're using cyclic for single dataloader
+    is_single_cyclic = dl_type == 'single' and os.environ.get('MEGATRON_USE_SINGLE_CYCLIC_DATALOADER', '0') == '1'
+    print(f"Rank [{torch.distributed.get_rank()}]: {is_single_cyclic=}", flush=True)
+
     def _get_iterator(dataloader_type, dataloader):
         """Return dataset iterator."""
         if dataloader_type == "single":
+            if is_single_cyclic:
+                return iter(cyclic_iter(dataloader))
+
             return RerunDataIterator(iter(dataloader))
         elif dataloader_type == "cyclic":
             return RerunDataIterator(iter(cyclic_iter(dataloader)))

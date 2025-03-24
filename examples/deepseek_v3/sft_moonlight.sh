@@ -11,6 +11,7 @@ export HL_LAUNCHER_TYPE="torchrun"
 export HL_HOSTSFILE="${MEGATRON_LM_ROOT}/examples/hostsfile"
 export HL_DATA_DIR_ROOT="${SCRIPT_DIR}/dataset"
 export HL_DATA_FILE_PREFIX="alpaca_zh-qwen-train.json"
+export MEGATRON_USE_SINGLE_CYCLIC_DATALOADER=1
 export HL_TOKENIZER_MODEL="${SCRIPT_DIR}/DeepSeek-V3"
 export HL_TOKENIZER_TYPE=DeepSeekV2Tokenizer
 
@@ -401,7 +402,6 @@ CMD="${CMD} \
     --eval-interval ${EVAL_INTERVAL} \
     --eval-iters ${EVAL_ITERS} \
     --data-path ${DATA_PATH} \
-    --dataloader-type cyclic \
     --init-method-std ${INIT_STD} \
     --no-check-for-nan-in-loss-and-grad \
     --num-workers ${NUM_WORKERS} \
