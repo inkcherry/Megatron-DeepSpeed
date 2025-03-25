@@ -702,7 +702,7 @@ class _ParamAndGradBuffer:
                 f"{bucket.grad_data.nelement()} padded size):"
             )
             for param in bucket.params:
-                log_strs.append(f'\t{param_to_name[param]}')
+                log_strs.append(f'\t{param_to_name[param]}(shape={param.shape}, dtype={param.dtype})')
         log_on_each_pipeline_stage(logger, logging.ERROR, '\n'.join(log_strs))
 
     def scale_gradients(self, scaling_factor: float) -> None:

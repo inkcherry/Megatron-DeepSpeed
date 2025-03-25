@@ -822,7 +822,7 @@ class _DeepSeekV2Tokenizer(MegatronTokenizer):
 
     @property
     def vocab_size(self):
-        return len(self.tokenizer) + self.extra_vocab_size
+        return len(self.tokenizer) + self.extra_vocab_size - 2
 
     @property
     def vocab(self):

@@ -13,7 +13,7 @@ export HL_DATA_DIR_ROOT="${SCRIPT_DIR}/dataset"
 export HL_DATA_FILE_PREFIX="alpaca_zh-qwen-train.json"
 export MEGATRON_USE_SINGLE_CYCLIC_DATALOADER=1
 export HL_TOKENIZER_MODEL="${SCRIPT_DIR}/DeepSeek-V3"
-export HL_TOKENIZER_TYPE=DeepSeekV2Tokenizer
+export HL_TOKENIZER_TYPE="DeepSeekV2Tokenizer"
 
 ## 1 node, drop
 export HL_SEQ_LEN=$((1*1024))
