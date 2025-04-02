@@ -379,8 +379,13 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
                 context (Tensor): Updated context tensor if cross-attention is used,
                 otherwise None.
         """
-
-        # Residual connection.
+        #hidden_states_shape [s,b,h]
+        # Residual connection.[s, b,h]
+        
+        # residual=hidden_states[:,0,:]
+        # residual1=hidden_states[:,1,:]
+        
+        ###!!! batch0 norm attn
         residual = hidden_states
 
         # Optional Input Layer norm
@@ -436,9 +441,171 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         # Optional Layer norm post the cross-attention.
         pre_mlp_layernorm_output = self.pre_mlp_layernorm(hidden_states)
 
+        
+        
+        
+        
+        
+        
+        #batch0 mlp
+        # MLP.
+        # mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
+        
+        
+        probs, routing_map = self.mlp.router(pre_mlp_layernorm_output)
+            
+        #all2all dispatch
+        (dispatched_input, tokens_per_expert) = self.mlp.token_dispatcher.token_permutation(
+            hidden_states, probs, routing_map
+        )
+        dispatched_input=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input)
+        
+        
+        
+        expert_output, mlp_bias = self.mlp.experts(dispatched_input, tokens_per_expert)
+            
+        #all2all combine
+        output, mlp_bias = self.mlp.token_dispatcher.token_unpermutation(expert_output, mlp_bias)
+        
+        output = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output)
+        
+        
+        if self.mlp.use_shared_expert and not self.mlp.shared_expert_overlap:
+                # if shared_expert_overlap is True, the expert calculation happens in
+                # the token_dispatcher to overlap communications and computations
+            output = output + self.mlp.shared_experts(hidden_states)
+        
+        mlp_output_with_bias=output, mlp_bias
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states = self.mlp_bda(self.training, self.config.bias_dropout_fusion)(
+                mlp_output_with_bias, residual, self.hidden_dropout
+            )
+
+        # Jit compiled function creates 'view' tensor. This tensor
+        # potentially gets saved in the MPU checkpoint function context,
+        # which rejects view tensors. While making a viewless tensor here
+        # won't result in memory savings (like the data loader, or
+        # p2p_communication), it serves to document the origin of this
+        # 'view' tensor.
+        output = make_viewless_tensor(
+            inp=hidden_states, requires_grad=hidden_states.requires_grad, keep_graph=True
+        )
+
+        # CUDA graph requires returned values to be Tensors
+        if self.config.external_cuda_graph and self.training:
+            return output
+        return output, context
+
+    def forward_bk(
+        self,
+        hidden_states,
+        attention_mask=None,
+        context=None,
+        context_mask=None,
+        rotary_pos_emb=None,
+        rotary_pos_cos=None,
+        rotary_pos_sin=None,
+        attention_bias=None,
+        inference_params=None,
+        packed_seq_params=None,
+        sequence_len_offset=None,
+    ):
+        """
+        Perform a forward pass through the transformer layer.
+
+        This method implements the core computation of a transformer layer, including
+        self-attention, cross-attention (if applicable), and feed-forward operations.
+
+        Args:
+            hidden_states (Tensor): Input tensor of shape [s, b, h] where s is sequence length,
+                b is batch size, and h is hidden size.
+            attention_mask (Tensor): Mask tensor for self-attention.
+            context (Tensor, optional): Context tensor for cross-attention.
+            context_mask (Tensor, optional): Mask tensor for cross-attention.
+            rotary_pos_emb (Tensor, optional): Rotary positional embeddings.
+            attention_bias (Tensor, optional): Bias tensor for Q * K.T.
+            inference_params (object, optional): Parameters for inference-time optimizations.
+            packed_seq_params (object, optional): Parameters for packed sequence processing.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing:
+                output (Tensor): Transformed hidden states of shape [s, b, h].
+                context (Tensor): Updated context tensor if cross-attention is used,
+                otherwise None.
+        """
+        #hidden_states_shape [s,b,h]
+        # Residual connection.[s, b,h]
+        
+        # residual=hidden_states[:,0,:]
+        # residual1=hidden_states[:,1,:]
+        
+        ###!!! batch0 norm attn
+        residual = hidden_states
+
+        # Optional Input Layer norm
+        input_layernorm_output = self.input_layernorm(hidden_states)
+
+        # Self attention.
+        attention_output_with_bias = self.self_attention(
+            input_layernorm_output,
+            attention_mask=attention_mask,
+            inference_params=inference_params,
+            rotary_pos_emb=rotary_pos_emb,
+            rotary_pos_cos=rotary_pos_cos,
+            rotary_pos_sin=rotary_pos_sin,
+            attention_bias=attention_bias,
+            packed_seq_params=packed_seq_params,
+            sequence_len_offset=sequence_len_offset,
+        )
+
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states = self.self_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias, residual, self.hidden_dropout
+            )
+
+        # Residual connection.
+        residual = hidden_states
+
+        # Optional Layer norm after self-attention
+        pre_cross_attn_layernorm_output = self.pre_cross_attn_layernorm(hidden_states)
+
+        # Cross attention.
+        attention_output_with_bias = self.cross_attention(
+            pre_cross_attn_layernorm_output,
+            attention_mask=context_mask,
+            key_value_states=context,
+            inference_params=inference_params,
+        )
+
+        if isinstance(attention_output_with_bias, dict) and "context" in attention_output_with_bias:
+            context = attention_output_with_bias["context"]
+
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states = self.cross_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias, residual, self.hidden_dropout
+            )
+
+        # Residual connection.
+        residual = hidden_states
+
+        # Optional Layer norm post the cross-attention.
+        pre_mlp_layernorm_output = self.pre_mlp_layernorm(hidden_states)
+
+        
+        
+        
+        
+        
+        
+        #batch0 mlp
         # MLP.
         mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
-
         # TODO: could we move `bias_dropout_add_exec_handler` itself
         # inside the module provided in the `bias_dropout_add_spec` module?
         with self.bias_dropout_add_exec_handler():

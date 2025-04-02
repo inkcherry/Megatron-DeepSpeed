@@ -523,44 +523,52 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         global_input_tokens = all_to_all(
             self.ep_group, permutated_local_input_tokens, self.output_splits, self.input_splits
         )
-        if self.shared_experts is not None:
-            self.shared_experts.linear_fc1_forward_and_act(global_input_tokens)
-
-        if self.tp_size > 1:
-            if self.output_splits_tp is None:
-                output_split_sizes = None
-            else:
-                output_split_sizes = self.output_splits_tp.tolist()
-            global_input_tokens = gather_from_sequence_parallel_region(
-                global_input_tokens, group=self.tp_group, output_split_sizes=output_split_sizes
-            )
-
-        # Permutation 2: Sort tokens by local expert.
-        if self.num_local_experts > 1:
-            if self.drop_and_pad:
-                global_input_tokens = (
-                    global_input_tokens.view(
-                        self.tp_size * self.ep_size,
-                        self.num_local_experts,
-                        self.capacity,
-                        *global_input_tokens.size()[1:],
-                    )
-                    .transpose(0, 1)
-                    .contiguous()
-                    .flatten(start_dim=0, end_dim=2)
-                )
-            else:
-                global_input_tokens = sort_chunks_by_idxs(
-                    global_input_tokens,
-                    self.num_global_tokens_per_local_expert.ravel(),
-                    self.sort_input_by_local_experts,
-                    fused=self.config.moe_permute_fusion,
-                )
-
+        
+        #显示调用。
+        # global_input_tokens=self.post_all2all_token_permutation(global_input_tokens)
+        
         if self.cuda_sync_point == "before_finish":
             torch.cuda.current_stream().synchronize()
 
         return global_input_tokens, tokens_per_expert
+
+    
+    
+    def post_all2all_token_permutation(self, global_input_tokens):
+            if self.shared_experts is not None:
+                self.shared_experts.linear_fc1_forward_and_act(global_input_tokens)
+
+            if self.tp_size > 1:
+                if self.output_splits_tp is None:
+                    output_split_sizes = None
+                else:
+                    output_split_sizes = self.output_splits_tp.tolist()
+                global_input_tokens = gather_from_sequence_parallel_region(
+                    global_input_tokens, group=self.tp_group, output_split_sizes=output_split_sizes
+                )
+
+            # Permutation 2: Sort tokens by local expert.
+            if self.num_local_experts > 1:
+                if self.drop_and_pad:
+                    global_input_tokens = (
+                        global_input_tokens.view(
+                            self.tp_size * self.ep_size,
+                            self.num_local_experts,
+                            self.capacity,
+                            *global_input_tokens.size()[1:],
+                        )
+                        .transpose(0, 1)
+                        .contiguous()
+                        .flatten(start_dim=0, end_dim=2)
+                    )
+                else:
+                    global_input_tokens = sort_chunks_by_idxs(
+                        global_input_tokens,
+                        self.num_global_tokens_per_local_expert.ravel(),
+                        self.sort_input_by_local_experts,
+                        fused=self.config.moe_permute_fusion,
+                    )
+            return global_input_tokens
 
     def token_unpermutation(
         self, hidden_states: torch.Tensor, bias: Optional[torch.Tensor] = None
@@ -620,6 +628,33 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         permutated_local_input_tokens = all_to_all(
             self.ep_group, hidden_states, self.input_splits, self.output_splits
         )
+        
+        
+        # if self.shared_experts is not None:
+        #     self.shared_experts.linear_fc2_forward(permutated_local_input_tokens)
+        #     self.shared_experts.post_forward_comm()
+
+        # # Unpermutation 1: AlltoAll output to output
+        # output = unpermute(
+        #     permutated_local_input_tokens,
+        #     self.reversed_local_input_permutation_mapping,
+        #     restore_shape=self.hidden_shape_before_permute,
+        #     probs=self.probs,
+        #     routing_map=self.routing_map,
+        #     fused=self.config.moe_permute_fusion,
+        #     drop_and_pad=self.drop_and_pad,
+        # )
+
+        # # Reshape the output tensor
+        # output = output.view(self.hidden_shape)
+
+        # # Add shared experts output
+        # if self.shared_experts is not None:
+        #     shared_expert_output = self.shared_experts.get_output()
+        #     output += shared_expert_output
+        return permutated_local_input_tokens, None
+    
+    def post_all2all_token_unpermutation(self, permutated_local_input_tokens):
         if self.shared_experts is not None:
             self.shared_experts.linear_fc2_forward(permutated_local_input_tokens)
             self.shared_experts.post_forward_comm()
@@ -642,7 +677,8 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         if self.shared_experts is not None:
             shared_expert_output = self.shared_experts.get_output()
             output += shared_expert_output
-        return output, None
+        return output
+        
 
 
 class _DispatchManager(ABC):
