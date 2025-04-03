@@ -417,7 +417,7 @@ class _ReduceScatterToTensorParallelRegion(torch.autograd.Function):
 
 class _AllToAll(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, group, input, output_split_sizes, input_split_sizes):
+    def forward(ctx, group, input, output_split_sizes, input_split_sizes, is_fwd=True):
         """Forward function."""
         ctx.group = group
         ctx.output_split_sizes = output_split_sizes
@@ -439,23 +439,36 @@ class _AllToAll(torch.autograd.Function):
                 dtype=input.dtype,
                 device=torch.cuda.current_device(),
             )
-        torch.distributed.all_to_all_single(
+        if is_fwd:
+            handle=torch.distributed.all_to_all_single(
             output,
             input,
             output_split_sizes=output_split_sizes,
             input_split_sizes=input_split_sizes,
             group=group,
-        )
-        return output
+            async_op=True
+            )
+            return output, handle
+        else:
+            handle=torch.distributed.all_to_all_single(
+            output,
+            input,
+            output_split_sizes=output_split_sizes,
+            input_split_sizes=input_split_sizes,
+            group=group,
+            )
+            return output
+            
 
     @staticmethod
     def backward(ctx, *grad_output):
         """Backward function."""
         return (
             None,
-            _AllToAll.apply(ctx.group, *grad_output, ctx.input_split_sizes, ctx.output_split_sizes),
+            _AllToAll.apply(ctx.group, grad_output[0], ctx.input_split_sizes, ctx.output_split_sizes,False),
             None,
             None,
+            None
         )
 
 

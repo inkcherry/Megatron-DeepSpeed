@@ -18,6 +18,9 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_viewless_tensor
 
 
+ALLTOALL_B0_HANDLE=None
+ALLTOALL_B1_HANDLE=None
+
 def get_transformer_layer_offset(config: TransformerConfig):
     """Get the index offset of current pipeline stage, given the level of pipelining."""
     pipeline_rank = parallel_state.get_pipeline_model_parallel_rank()
@@ -385,6 +388,8 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         # residual=hidden_states[:,0,:]
         # residual1=hidden_states[:,1,:]
         
+        
+
         ###!!! batch0 norm attn
         residual = hidden_states
 
@@ -455,9 +460,18 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         probs, routing_map = self.mlp.router(pre_mlp_layernorm_output)
             
         #all2all dispatch
-        (dispatched_input, tokens_per_expert) = self.mlp.token_dispatcher.token_permutation(
+        (dispatched_input, tokens_per_expert , handle0) = self.mlp.token_dispatcher.token_permutation(
             hidden_states, probs, routing_map
         )
+        handle0.wait()
+        
+        
+        
+        
+        
+        
+        
+        
         dispatched_input=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input)
         
         
@@ -465,8 +479,8 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         expert_output, mlp_bias = self.mlp.experts(dispatched_input, tokens_per_expert)
             
         #all2all combine
-        output, mlp_bias = self.mlp.token_dispatcher.token_unpermutation(expert_output, mlp_bias)
-        
+        output, mlp_bias, handle1 = self.mlp.token_dispatcher.token_unpermutation(expert_output, mlp_bias)
+        handle1.wait()
         output = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output)
         
         

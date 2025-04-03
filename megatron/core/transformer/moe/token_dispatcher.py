@@ -471,7 +471,7 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         return num_tokens_per_local_expert
 
     def token_permutation(
-        self, hidden_states: torch.Tensor, probs: torch.Tensor, routing_map: torch.Tensor
+        self, hidden_states: torch.Tensor, probs: torch.Tensor, routing_map: torch.Tensor,handle=None
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Dispatch tokens to local experts using AlltoAll communication.
@@ -520,8 +520,8 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         # Perform expert parallel AlltoAll communication
         if self.cuda_sync_point == "before_ep_alltoall":
             torch.cuda.current_stream().synchronize()
-        global_input_tokens = all_to_all(
-            self.ep_group, permutated_local_input_tokens, self.output_splits, self.input_splits
+        global_input_tokens, handle = all_to_all(
+            self.ep_group, permutated_local_input_tokens, self.output_splits, self.input_splits      
         )
         
         #显示调用。
@@ -530,7 +530,7 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         if self.cuda_sync_point == "before_finish":
             torch.cuda.current_stream().synchronize()
 
-        return global_input_tokens, tokens_per_expert
+        return global_input_tokens, tokens_per_expert, handle
 
     
     
@@ -625,7 +625,7 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
 
         # Perform expert parallel AlltoAll communication
         # hidden_states: [SEQL, H] -> [SEQL, H/TP]
-        permutated_local_input_tokens = all_to_all(
+        permutated_local_input_tokens, handle = all_to_all(
             self.ep_group, hidden_states, self.input_splits, self.output_splits
         )
         
@@ -652,7 +652,7 @@ class MoEAlltoAllTokenDispatcher(MoETokenDispatcher):
         # if self.shared_experts is not None:
         #     shared_expert_output = self.shared_experts.get_output()
         #     output += shared_expert_output
-        return permutated_local_input_tokens, None
+        return permutated_local_input_tokens, None, handle
     
     def post_all2all_token_unpermutation(self, permutated_local_input_tokens):
         if self.shared_experts is not None:
