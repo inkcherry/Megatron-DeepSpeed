@@ -385,21 +385,23 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         #hidden_states_shape [s,b,h]
         # Residual connection.[s, b,h]
         
-        # residual=hidden_states[:,0,:]
-        # residual1=hidden_states[:,1,:]
-        
-        
+        residual0=hidden_states[:,0:1,:]
+        residual1=hidden_states[:,1:2,:]
+        hidden_states0=hidden_states[:,0:1,:]
+        hidden_states1=hidden_states[:,1:2,:]
+        attention_mask0=attention_mask[0:1]
+        attention_mask1=attention_mask[1:2]
 
         ###!!! batch0 norm attn
-        residual = hidden_states
+        # residual = hidden_states
 
         # Optional Input Layer norm
-        input_layernorm_output = self.input_layernorm(hidden_states)
+        input_layernorm_output0 = self.input_layernorm(hidden_states0)
 
         # Self attention.
-        attention_output_with_bias = self.self_attention(
-            input_layernorm_output,
-            attention_mask=attention_mask,
+        attention_output_with_bias0 = self.self_attention(
+            input_layernorm_output0,
+            attention_mask=attention_mask0,
             inference_params=inference_params,
             rotary_pos_emb=rotary_pos_emb,
             rotary_pos_cos=rotary_pos_cos,
@@ -412,39 +414,40 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         # TODO: could we move `bias_dropout_add_exec_handler` itself
         # inside the module provided in the `bias_dropout_add_spec` module?
         with self.bias_dropout_add_exec_handler():
-            hidden_states = self.self_attn_bda(self.training, self.config.bias_dropout_fusion)(
-                attention_output_with_bias, residual, self.hidden_dropout
+            hidden_states0 = self.self_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias0, residual0, self.hidden_dropout
             )
 
         # Residual connection.
-        residual = hidden_states
+        residual0 = hidden_states0
 
         # Optional Layer norm after self-attention
-        pre_cross_attn_layernorm_output = self.pre_cross_attn_layernorm(hidden_states)
+        pre_cross_attn_layernorm_output0 = self.pre_cross_attn_layernorm(hidden_states0)
 
         # Cross attention.
-        attention_output_with_bias = self.cross_attention(
-            pre_cross_attn_layernorm_output,
+        attention_output_with_bias0 = self.cross_attention(
+            pre_cross_attn_layernorm_output0,
             attention_mask=context_mask,
             key_value_states=context,
             inference_params=inference_params,
         )
 
-        if isinstance(attention_output_with_bias, dict) and "context" in attention_output_with_bias:
-            context = attention_output_with_bias["context"]
+        if isinstance(attention_output_with_bias0, dict) and "context" in attention_output_with_bias0:
+            context = attention_output_with_bias0["context"]
+            b=0
 
         # TODO: could we move `bias_dropout_add_exec_handler` itself
         # inside the module provided in the `bias_dropout_add_spec` module?
         with self.bias_dropout_add_exec_handler():
-            hidden_states = self.cross_attn_bda(self.training, self.config.bias_dropout_fusion)(
-                attention_output_with_bias, residual, self.hidden_dropout
+            hidden_states0 = self.cross_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias0, residual0, self.hidden_dropout
             )
 
         # Residual connection.
-        residual = hidden_states
+        residual0 = hidden_states0
 
         # Optional Layer norm post the cross-attention.
-        pre_mlp_layernorm_output = self.pre_mlp_layernorm(hidden_states)
+        pre_mlp_layernorm_output0 = self.pre_mlp_layernorm(hidden_states0)
 
         
         
@@ -457,11 +460,11 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         # mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
         
         
-        probs, routing_map = self.mlp.router(pre_mlp_layernorm_output)
+        probs0, routing_map0 = self.mlp.router(pre_mlp_layernorm_output0)
             
         #all2all dispatch
-        (dispatched_input, tokens_per_expert , handle0) = self.mlp.token_dispatcher.token_permutation(
-            hidden_states, probs, routing_map
+        (dispatched_input0, tokens_per_expert0 , handle0) = self.mlp.token_dispatcher.token_permutation(
+            hidden_states0, probs0, routing_map0
         )
         handle0.wait()
         
@@ -472,29 +475,29 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
-        dispatched_input=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input)
+        dispatched_input0=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input0)
         
         
         
-        expert_output, mlp_bias = self.mlp.experts(dispatched_input, tokens_per_expert)
+        expert_output0, mlp_bias0 = self.mlp.experts(dispatched_input0, tokens_per_expert0)
             
         #all2all combine
-        output, mlp_bias, handle1 = self.mlp.token_dispatcher.token_unpermutation(expert_output, mlp_bias)
-        handle1.wait()
-        output = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output)
+        output0, mlp_bias0, handle0 = self.mlp.token_dispatcher.token_unpermutation(expert_output0, mlp_bias0)
+        handle0.wait()
+        output0 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output0)
         
         
         if self.mlp.use_shared_expert and not self.mlp.shared_expert_overlap:
                 # if shared_expert_overlap is True, the expert calculation happens in
                 # the token_dispatcher to overlap communications and computations
-            output = output + self.mlp.shared_experts(hidden_states)
+            output0 = output0 + self.mlp.shared_experts(hidden_states0)
         
-        mlp_output_with_bias=output, mlp_bias
+        mlp_output_with_bias0=output0, mlp_bias0
         # TODO: could we move `bias_dropout_add_exec_handler` itself
         # inside the module provided in the `bias_dropout_add_spec` module?
         with self.bias_dropout_add_exec_handler():
             hidden_states = self.mlp_bda(self.training, self.config.bias_dropout_fusion)(
-                mlp_output_with_bias, residual, self.hidden_dropout
+                mlp_output_with_bias0, residual0, self.hidden_dropout
             )
 
         # Jit compiled function creates 'view' tensor. This tensor
@@ -503,13 +506,141 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         # won't result in memory savings (like the data loader, or
         # p2p_communication), it serves to document the origin of this
         # 'view' tensor.
-        output = make_viewless_tensor(
-            inp=hidden_states, requires_grad=hidden_states.requires_grad, keep_graph=True
+        output0 = make_viewless_tensor(
+            inp=hidden_states0, requires_grad=hidden_states0.requires_grad, keep_graph=True
         )
 
         # CUDA graph requires returned values to be Tensors
+    
+        
+        
+        
+        
+        
+        
+        
+        
+        
+                ###!!! batch0 norm attn
+        # residual = hidden_states
+
+        # Optional Input Layer norm
+        input_layernorm_output1 = self.input_layernorm(hidden_states1)
+
+        # Self attention.
+        attention_output_with_bias1 = self.self_attention(
+            input_layernorm_output1,
+            attention_mask=attention_mask1,
+            inference_params=inference_params,
+            rotary_pos_emb=rotary_pos_emb,
+            rotary_pos_cos=rotary_pos_cos,
+            rotary_pos_sin=rotary_pos_sin,
+            attention_bias=attention_bias,
+            packed_seq_params=packed_seq_params,
+            sequence_len_offset=sequence_len_offset,
+        )
+
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states1 = self.self_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias1, residual1, self.hidden_dropout
+            )
+
+        # Residual connection.
+        residual1 = hidden_states1
+
+        # Optional Layer norm after self-attention
+        pre_cross_attn_layernorm_output1 = self.pre_cross_attn_layernorm(hidden_states1)
+
+        # Cross attention.
+        attention_output_with_bias1 = self.cross_attention(
+            pre_cross_attn_layernorm_output1,
+            attention_mask=context_mask,
+            key_value_states=context,
+            inference_params=inference_params,
+        )
+
+        if isinstance(attention_output_with_bias1, dict) and "context" in attention_output_with_bias1:
+            context = attention_output_with_bias1["context"]
+
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states1 = self.cross_attn_bda(self.training, self.config.bias_dropout_fusion)(
+                attention_output_with_bias1, residual1, self.hidden_dropout
+            )
+
+        # Residual connection.
+        residual1 = hidden_states1
+
+        # Optional Layer norm post the cross-attention.
+        pre_mlp_layernorm_output1 = self.pre_mlp_layernorm(hidden_states1)
+
+        
+        
+        
+        
+        
+        
+        #batch0 mlp
+        # MLP.
+        # mlp_output_with_bias = self.mlp(pre_mlp_layernorm_output)
+        
+        
+        probs1, routing_map1 = self.mlp.router(pre_mlp_layernorm_output1)
+            
+        #all2all dispatch
+        (dispatched_input1, tokens_per_expert1 , handle1) = self.mlp.token_dispatcher.token_permutation(
+            hidden_states1, probs1, routing_map1
+        )
+        handle1.wait()
+        
+        
+        
+        
+        
+        dispatched_input1=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input1)
+        
+        
+        
+        expert_output1, mlp_bias1 = self.mlp.experts(dispatched_input1, tokens_per_expert1)
+            
+        #all2all combine
+        output1, mlp_bias1, handle1 = self.mlp.token_dispatcher.token_unpermutation(expert_output1, mlp_bias1)
+        handle1.wait()
+        output1 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output1)
+        
+        
+        if self.mlp.use_shared_expert and not self.mlp.shared_expert_overlap:
+                # if shared_expert_overlap is True, the expert calculation happens in
+                # the token_dispatcher to overlap communications and computations
+            output1 = output1 + self.mlp.shared_experts(hidden_states1)
+        
+        mlp_output_with_bias1=output1, mlp_bias1
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states = self.mlp_bda(self.training, self.config.bias_dropout_fusion)(
+                mlp_output_with_bias1, residual1, self.hidden_dropout
+            )
+
+        # Jit compiled function creates 'view' tensor. This tensor
+        # potentially gets saved in the MPU checkpoint function context,
+        # which rejects view tensors. While making a viewless tensor here
+        # won't result in memory savings (like the data loader, or
+        # p2p_communication), it serves to document the origin of this
+        # 'view' tensor.
+        output1 = make_viewless_tensor(
+            inp=hidden_states1, requires_grad=hidden_states1.requires_grad, keep_graph=True
+        )
+
+        # CUDA graph requires returned values to be Tensors
+        output =torch.cat([output0,output1],dim=1)
         if self.config.external_cuda_graph and self.training:
-            return output
+            return output1 #+ output0
+        
+        
         return output, context
 
     def forward_bk(
