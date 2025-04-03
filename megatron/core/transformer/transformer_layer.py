@@ -466,62 +466,11 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         (dispatched_input0, tokens_per_expert0 , handle0) = self.mlp.token_dispatcher.token_permutation(
             hidden_states0, probs0, routing_map0
         )
-        handle0.wait()
         
         
         
-        
-        
-        
-        
-        
-        dispatched_input0=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input0)
-        
-        
-        
-        expert_output0, mlp_bias0 = self.mlp.experts(dispatched_input0, tokens_per_expert0)
-            
-        #all2all combine
-        output0, mlp_bias0, handle0 = self.mlp.token_dispatcher.token_unpermutation(expert_output0, mlp_bias0)
-        handle0.wait()
-        output0 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output0)
-        
-        
-        if self.mlp.use_shared_expert and not self.mlp.shared_expert_overlap:
-                # if shared_expert_overlap is True, the expert calculation happens in
-                # the token_dispatcher to overlap communications and computations
-            output0 = output0 + self.mlp.shared_experts(hidden_states0)
-        
-        mlp_output_with_bias0=output0, mlp_bias0
-        # TODO: could we move `bias_dropout_add_exec_handler` itself
-        # inside the module provided in the `bias_dropout_add_spec` module?
-        with self.bias_dropout_add_exec_handler():
-            hidden_states = self.mlp_bda(self.training, self.config.bias_dropout_fusion)(
-                mlp_output_with_bias0, residual0, self.hidden_dropout
-            )
-
-        # Jit compiled function creates 'view' tensor. This tensor
-        # potentially gets saved in the MPU checkpoint function context,
-        # which rejects view tensors. While making a viewless tensor here
-        # won't result in memory savings (like the data loader, or
-        # p2p_communication), it serves to document the origin of this
-        # 'view' tensor.
-        output0 = make_viewless_tensor(
-            inp=hidden_states0, requires_grad=hidden_states0.requires_grad, keep_graph=True
-        )
-
-        # CUDA graph requires returned values to be Tensors
-    
-        
-        
-        
-        
-        
-        
-        
-        
-        
-                ###!!! batch0 norm attn
+             
+        ###!!! batch1 norm attn
         # residual = hidden_states
 
         # Optional Input Layer norm
@@ -594,6 +543,23 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         (dispatched_input1, tokens_per_expert1 , handle1) = self.mlp.token_dispatcher.token_permutation(
             hidden_states1, probs1, routing_map1
         )
+        
+        
+        
+        
+        
+        
+        handle0.wait()
+        dispatched_input0=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input0)
+        
+        expert_output0, mlp_bias0 = self.mlp.experts(dispatched_input0, tokens_per_expert0)
+            
+        #all2all combine
+        output0, mlp_bias0, handle0 = self.mlp.token_dispatcher.token_unpermutation(expert_output0, mlp_bias0)
+
+        
+        
+        
         handle1.wait()
         
         
@@ -608,6 +574,55 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
             
         #all2all combine
         output1, mlp_bias1, handle1 = self.mlp.token_dispatcher.token_unpermutation(expert_output1, mlp_bias1)
+        
+        
+        
+        
+        handle0.wait()
+        output0 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output0)
+        
+        
+        
+        
+        
+        
+        
+        
+        if self.mlp.use_shared_expert and not self.mlp.shared_expert_overlap:
+                # if shared_expert_overlap is True, the expert calculation happens in
+                # the token_dispatcher to overlap communications and computations
+            output0 = output0 + self.mlp.shared_experts(hidden_states0)
+        
+        mlp_output_with_bias0=output0, mlp_bias0
+        # TODO: could we move `bias_dropout_add_exec_handler` itself
+        # inside the module provided in the `bias_dropout_add_spec` module?
+        with self.bias_dropout_add_exec_handler():
+            hidden_states = self.mlp_bda(self.training, self.config.bias_dropout_fusion)(
+                mlp_output_with_bias0, residual0, self.hidden_dropout
+            )
+
+        # Jit compiled function creates 'view' tensor. This tensor
+        # potentially gets saved in the MPU checkpoint function context,
+        # which rejects view tensors. While making a viewless tensor here
+        # won't result in memory savings (like the data loader, or
+        # p2p_communication), it serves to document the origin of this
+        # 'view' tensor.
+        output0 = make_viewless_tensor(
+            inp=hidden_states0, requires_grad=hidden_states0.requires_grad, keep_graph=True
+        )
+
+        # CUDA graph requires returned values to be Tensors
+    
+        
+        
+        
+        
+        
+        
+        
+        
+   
+     
         handle1.wait()
         output1 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output1)
         
