@@ -16,6 +16,132 @@ from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import make_viewless_tensor
+from contextlib import contextmanager
+
+
+class AsyncCommBucket:
+    """
+    Store aynchronous communication operations.
+    """
+
+    def __init__(self):
+        self._async_op: Dict[int, "dist.Work"] = {}
+        self._copy_async_op: Dict[int, "dist.Work"] = {}
+
+    def add(self, op_name: int, work: "dist.Work"):
+        assert op_name not in self._async_op, f"Operation with name: {op_name} already exists"
+        assert work is not None
+        self._async_op[op_name] = work
+        self._copy_async_op[op_name] = work
+    def get(self, op_name: str) -> "dist.Work":
+        if op_name not in self._async_op:
+            raise KeyError(f"Operation with name: {op_name} doesn't exist")
+
+        return self._async_op.get(op_name)
+
+    def pop(self, op_name: str) -> "dist.Work":
+        if op_name not in self._async_op:
+            raise KeyError(f"Operation with name: {op_name} doesn't exist")
+
+        return self._async_op.pop(op_name)
+
+    def wait(self, op_name: str):
+        """Wait and remove the operation from the bucket"""
+        work = self.pop(op_name)
+        work.wait()
+
+    def is_all_completed(self) -> bool:
+        if not len(self._async_op) == 0:
+            return False
+
+        not_finished = []
+        for k, v in self._copy_async_op.items():
+            if v.is_completed() is not True:
+                not_finished.append((k, v))
+        return len(not_finished) == 0
+
+    def clear_all(self):
+        self._async_op.clear()
+        self._copy_async_op.clear()
+CUDA_STREAM_COMM_NAME = "comm_stream_{}"
+
+class CudaStreamManager:
+    def __init__(self):
+        self._streams: Dict[str, "torch.cuda.Stream"] = {}
+        self.comm_bucket = AsyncCommBucket()
+
+    def init_default_comm_stream(self):
+        """
+        Initialize the default communication stream for the current cuda device.
+        """
+        self.create(CUDA_STREAM_COMM_NAME.format(torch.cuda.current_device()), torch.cuda.current_device())
+
+    def create(self, name: str, device: torch.device):
+        assert name not in self._streams
+        self._streams[name] = torch.cuda.Stream(device=device)
+
+    def get(self, name: str):
+        if name not in self._streams:
+            self.create(name, torch.cuda.current_device())
+        return self._streams.get(name)
+
+    def get_default_comm_stream(self) -> torch.cuda.Stream:
+        """
+        Return the default communication stream for the current cuda device.
+        """
+        return self.get(CUDA_STREAM_COMM_NAME.format(torch.cuda.current_device()))
+
+    @contextmanager
+    def run_on_stream(self, name: str):
+        stream = self.get(name)
+        with torch.cuda.stream(stream):
+            yield stream
+            
+def is_sync_stream():
+    return True
+
+class WaitComm(torch.autograd.Function):
+    """
+    Enforce a tensor to wait for the communication operation to finish
+    in torch's autograd graph.
+    """
+
+    @staticmethod
+    def forward(ctx, input: torch.Tensor, op_name: str, comm_stream: torch.cuda.Stream, comm_bucket: AsyncCommBucket):
+        assert isinstance(comm_stream, torch.cuda.Stream)
+        ctx.op_name = op_name
+        ctx.comm_stream = comm_stream
+        ctx.comm_bucket = comm_bucket
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        """
+        NOTE: because the communication operation is already being executed
+        so the communication stream don't have to wait for the compute stream here
+        but the compute stream waits for the communication stream
+        before proceeding
+        """
+        if is_sync_stream(ctx.op_name):
+            handle = ctx.comm_bucket.pop(ctx.op_name)
+            handle.wait()
+
+            ctx.comm_stream.synchronize()
+            torch.cuda.default_stream().wait_stream(ctx.comm_stream)
+
+        return grad_output, None, None, None
+
+def insert_backward_sync_to_tensor(
+    tensor: torch.Tensor, op_name: str, stream_manager: CudaStreamManager
+) -> torch.Tensor:
+    """
+    Insert a wait communication operation of a given op_name to the autograd graph
+    of a tensor.
+    """
+
+    assert isinstance(stream_manager, CudaStreamManager)
+    comm_stream = stream_manager.get(CUDA_STREAM_COMM_NAME.format(torch.cuda.current_device()))
+    return WaitComm.apply(tensor, op_name, comm_stream, stream_manager.comm_bucket)
 
 
 ALLTOALL_B0_HANDLE=None
@@ -234,6 +360,22 @@ class BaseTransformerLayer(ABC):
         pass
 
 
+
+class CommStreamMananger():
+    def __init__(self, name):
+        self.stream=torch.cuda.stream()
+        self.stream_name=name
+    
+    def get_stream(self):
+        return self.stream
+    
+    def get_name(self):
+        return self.stream_name
+    
+    def sync_stream(self):
+        torch.cuda.default_stream().wait(self.stream)
+    
+        
 class TransformerLayer(MegatronModule, BaseTransformerLayer):
     """A single transformer layer.
 
@@ -249,7 +391,9 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         hidden_dropout: float = None,
     ):
         super().__init__(config=config)
-
+        self.commstream_mananger=CudaStreamManager()
+        # self.commstream_mananger_new.
+        # self.commstream_mananger_old=CommStreamMananger("fwdall2all")
         if config.enable_cuda_graph:
             if not self.training:
                 # Cudagraphs for inference are only enabled with the flash decoding kernel
@@ -548,8 +692,11 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
+        with self.commstream_mananger.get_default_comm_stream():
+            handle0.wait()
+        torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
         
-        handle0.wait()
+        
         dispatched_input0=self.mlp.token_dispatcher.post_all2all_token_permutation(dispatched_input0)
         
         expert_output0, mlp_bias0 = self.mlp.experts(dispatched_input0, tokens_per_expert0)
@@ -559,9 +706,10 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
 
         
         
-        
-        handle1.wait()
-        
+        with self.commstream_mananger.get_default_comm_stream():
+            handle1.wait()
+        torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
+   
         
         
         
@@ -577,8 +725,11 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
-        
-        handle0.wait()
+        with self.commstream_mananger.get_default_comm_stream():
+            handle0.wait()
+        torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
+      
+
         output0 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output0)
         
         
@@ -621,9 +772,12 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
-   
+
+        with self.commstream_mananger.get_default_comm_stream():
+            handle1.wait()
+        torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
      
-        handle1.wait()
+        
         output1 = self.mlp.token_dispatcher.post_all2all_token_unpermutation(output1)
         
         
