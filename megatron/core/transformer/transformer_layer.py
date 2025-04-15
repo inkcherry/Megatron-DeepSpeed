@@ -692,7 +692,7 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
-        with self.commstream_mananger.get_default_comm_stream():
+        with  torch.cuda.stream(self.commstream_mananger.get_default_comm_stream()):
             handle0.wait()
         torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
         
@@ -706,7 +706,7 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
 
         
         
-        with self.commstream_mananger.get_default_comm_stream():
+        with  torch.cuda.stream(self.commstream_mananger.get_default_comm_stream()):
             handle1.wait()
         torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
    
@@ -725,7 +725,7 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
         
-        with self.commstream_mananger.get_default_comm_stream():
+        with  torch.cuda.stream(self.commstream_mananger.get_default_comm_stream()):
             handle0.wait()
         torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
       
@@ -773,7 +773,7 @@ class TransformerLayer(MegatronModule, BaseTransformerLayer):
         
         
 
-        with self.commstream_mananger.get_default_comm_stream():
+        with  torch.cuda.stream(self.commstream_mananger.get_default_comm_stream()):
             handle1.wait()
         torch.cuda.default_stream().wait_stream(self.commstream_mananger.get_default_comm_stream())
      
